@@ -1,91 +1,72 @@
+# The heart of the operation: displays and runs everything
+
 import sys
+import os
 from math import sin, cos, radians
 from random import randint
-from PyQt5.QtWidgets import QWidget, QApplication
-from PyQt5.QtGui import QPainter, QColor, QFont, QPen
+from LineFinder import *
+from skimage import io
+from PyQt5.QtWidgets import QApplication, QMainWindow, QLabel, QGridLayout, QWidget
+from PyQt5.QtGui import QPixmap, QPainter, QColor, QFont, QPen
 from PyQt5.QtCore import Qt, QTimer
+
+QApplication.setAttribute(Qt.AA_EnableHighDpiScaling, True)
 
 class KnotCanvas(QWidget):
 
-	def __init__(self):
-		super().__init__()
-		# class variables
-		self.arrowPosition = (200, 200)
-		self.arrowSize = 150
-		self.arrowAngle = 180
+    def __init__(self, fileName, tickFPS):
+        super().__init__()
 
-		# init everything else
-		self.initUI()
-		
-		# begin refresh timer
-		timer = QTimer(self, timeout=self.getArrowPosition, interval=1000)
-		timer.start()
-		
-	def initUI(self):      
-		self.setGeometry(600, 200, 400, 400)
-		self.setWindowTitle('Knot Analysis')
-		self.show()
+        # declare class variables
+        self.fileName = fileName
+        self.imageData = io.imread(fileName) # get image data with sci-kit
+        self.lf = LineFinder(self.imageData) # initialize LineFinder
 
-	def getArrowPosition(self):
-		self.arrowPosition = (randint(0, 400), randint(0, 400))
-		self.arrowSize = randint(2, 100)
-		self.arrowAngle = randint(0,360)
-		print('Arrow of size {} pointing at ({}, {}) with angle {}...'.format(
-			self.arrowSize,
-			self.arrowPosition[0],
-			self.arrowPosition[1],
-			self.arrowAngle
-		))
-		self.update() # run paintEvent()
+        # boilerplate to add image background
+        self.im = QPixmap(fileName)
+        self.label = QLabel()
+        self.label.setPixmap(self.im)
+        self.grid = QGridLayout()
+        self.grid.addWidget(self.label, 1, 1)
+        self.setLayout(self.grid)
 
-	def paintEvent(self, event):
-		qp = QPainter()
-		qp.begin(self)
-		qp.setRenderHint(QPainter.Antialiasing, True)
-		qp.setRenderHint(QPainter.SmoothPixmapTransform, True)
-		self.drawArrow(
-			qp,
-			self.arrowPosition[0],
-			self.arrowPosition[1],
-			self.arrowSize,
-			self.arrowAngle
-		)
-		qp.end()
+        # set window meta info
+        self.setGeometry(200, 150, 1, 1)
+        self.setWindowTitle("Knot Analysis")
+        self.show()
 
-	def drawArrow(self, qp, x, y, size, deg):
-		# convert to radians and get opposite angle to be more intuitive
-		rad = radians((deg+180) % 360)
+        # begin frame-by-frame refresh timer
+        timer = QTimer(self, timeout=self.doTick, interval=1000/tickFPS)
+        timer.start()
 
-		# get initial endpoints of body and tips
-		pivotX = x
-		pivotY = y
-		bodyX = pivotX + size
-		bodyY = pivotY
-		tip1X = pivotX + size/3
-		tip1Y = pivotY + size/6
-		tip2X = pivotX + size/3
-		tip2Y = pivotY - size/6
+    # boilderplate for a frame update
+    def doTick(self):
+        self.tickLogic() # perform each tick logic
+        self.update() # re-run paintEvent()
 
-		# rotate endpoints around the pivot
-		eBodyX = (bodyX-pivotX) * cos(rad) - (bodyY-pivotY) * sin(rad) + pivotX
-		eBodyY = (bodyX-pivotX) * sin(rad) + (bodyY-pivotY) * cos(rad) + pivotY
-		eTip1X = (tip1X-pivotX) * cos(rad) - (tip1Y-pivotY) * sin(rad) + pivotX
-		eTip1Y = (tip1X-pivotX) * sin(rad) + (tip1Y-pivotY) * cos(rad) + pivotY
-		eTip2X = (tip2X-pivotX) * cos(rad) - (tip2Y-pivotY) * sin(rad) + pivotX
-		eTip2Y = (tip2X-pivotX) * sin(rad) + (tip2Y-pivotY) * cos(rad) + pivotY
+    # adjust local variables each frame update
+    def tickLogic(self):
+        self.lf.setPosition(randint(150, 350), randint(150, 350))
+        self.lf.setSize(randint(10, 30))
+        self.lf.setRotation(randint(0, 359))
 
-		# draw the arrow
-		pen = QPen(Qt.red, 2, Qt.SolidLine)
-		qp.setPen(pen)
+    # boilerplate to handle frame-by-frame updates
+    def paintEvent(self, event):
+        self.im = QPixmap(self.fileName) # reset background
+        self.label.setPixmap(self.im)
+        qp = QPainter() # start painting
+        qp.begin(self.im)
+        self.draw(qp)
+        qp.end()
+        self.label.setPixmap(self.im) # update image with painting on top
 
-		# body
-		qp.drawLine(pivotX, pivotY, eBodyX, eBodyY) 
-
-		# tips
-		qp.drawLine(pivotX, pivotY, eTip1X, eTip1Y)
-		qp.drawLine(pivotX, pivotY, eTip2X, eTip2Y)
+    # perform the painting logic
+    def draw(self, qp):
+        pen = QPen(Qt.red, 2, Qt.SolidLine)
+        qp.setPen(pen)
+        self.lf.drawLineFinder(qp) # draw the linefinder
 
 if __name__ == '__main__':
-	app = QApplication(sys.argv)
-	ex = KnotCanvas()
-	sys.exit(app.exec_())
+    app = QApplication(sys.argv)
+    ex = KnotCanvas('knot.png', 30)
+    sys.exit(app.exec_())

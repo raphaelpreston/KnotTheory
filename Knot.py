@@ -1,4 +1,4 @@
 class Knot:
-	def __init__(self):
-		self.arcs = []
-		self.crossings = []
+    def __init__(self):
+        self.arcs = []
+        self.crossings = []
