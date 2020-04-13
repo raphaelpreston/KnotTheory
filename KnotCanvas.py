@@ -20,7 +20,8 @@ class KnotCanvas(QWidget):
         # declare class variables
         self.fileName = fileName
         self.imageData = io.imread(fileName) # get image data with sci-kit
-        self.lf = LineFinder(self.imageData) # initialize LineFinder
+        self.lf = LineFinder(self.imageData, x=randint(150,450),
+            y=randint(150, 450), degreeRot=randint(0,359), displayType='arrow') # initialize LineFinder
 
         # boilerplate to add image background
         self.im = QPixmap(fileName)
@@ -44,12 +45,6 @@ class KnotCanvas(QWidget):
         self.tickLogic() # perform each tick logic
         self.update() # re-run paintEvent()
 
-    # adjust local variables each frame update
-    def tickLogic(self):
-        self.lf.setPosition(randint(150, 350), randint(150, 350))
-        self.lf.setSize(randint(10, 30))
-        self.lf.setRotation(randint(0, 359))
-
     # boilerplate to handle frame-by-frame updates
     def paintEvent(self, event):
         self.im = QPixmap(self.fileName) # reset background
@@ -60,7 +55,11 @@ class KnotCanvas(QWidget):
         qp.end()
         self.label.setPixmap(self.im) # update image with painting on top
 
-    # perform the painting logic
+    # perform the logic for each frame update
+    def tickLogic(self):
+        self.lf.getNextPosition() # set the linefinder's next position # TODO: could make this a linefinder.dotick or something
+
+    # paint the stuff each tick
     def draw(self, qp):
         pen = QPen(Qt.red, 2, Qt.SolidLine)
         qp.setPen(pen)
@@ -68,5 +67,5 @@ class KnotCanvas(QWidget):
 
 if __name__ == '__main__':
     app = QApplication(sys.argv)
-    ex = KnotCanvas('knot.png', 30)
+    ex = KnotCanvas('knot.png', 15)
     sys.exit(app.exec_())
