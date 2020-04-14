@@ -17,6 +17,7 @@ def drawArrow(qp, x, y, size, degreeRot):
     tip2Y = pivotY - size/6
 
     # rotate endpoints around the pivot
+    # TODO: might be faster to just determine points with trig and not rotate
     eBodyX = (bodyX-pivotX) * cos(rad) - (bodyY-pivotY) * sin(rad) + pivotX
     eBodyY = (bodyX-pivotX) * sin(rad) + (bodyY-pivotY) * cos(rad) + pivotY
     eTip1X = (tip1X-pivotX) * cos(rad) - (tip1Y-pivotY) * sin(rad) + pivotX

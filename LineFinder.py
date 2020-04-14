@@ -1,5 +1,5 @@
 # Runs around an image to identify arcs and crossings.
-# Sends back all relevant information to KnotCanvas. TODO: maybe add a parent handler here?
+# Sends back all relevant information to KnotHandler.
 
 from random import randint
 from math import sin, cos, radians
@@ -50,8 +50,8 @@ class LineFinder:
         # print('New path (rot {}) goes from {} to {}'.format(self.degreeRot, (self.x, self.y), (targetPoint[0], targetPoint[1])))
         self.stepIter = iter(path) # don't initialize iter to first value
 
-    # update position
-    def getNextPosition(self): # TODO: make a tick function and clean this up
+    # update instance variables as necessary
+    def getNextPosition(self): # TODO: make a tick function and clean this up && make lineFinder line follower
         if not self.foundLine:
             # analyze current position and update class variables
             pixelColor = tuple(self.imageData[self.y][self.x][0:3]) # swap x & y, ommit alpha channel
@@ -59,6 +59,7 @@ class LineFinder:
                 self.foundLine = True
                 print('Found a line at {}'.format((self.x, self.y)))
 
+    def setNextPosition(self):
         if not self.foundLine: # take a standard step on the path
             if self.stepIter is None: # for first run
                 self.computeNextPath()
@@ -74,7 +75,6 @@ class LineFinder:
                 print('Error: Couldn\'t iterate to next step.')
             self.setPosition(nextStep[0], nextStep[1])
             # print('Set position to {}'.format((self.x, self.y)))
-
 
     # draw the actual linefinder each tick
     def drawLineFinder(self, qp):

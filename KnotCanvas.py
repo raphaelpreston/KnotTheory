@@ -5,6 +5,7 @@ import os
 from math import sin, cos, radians
 from random import randint
 from LineFinder import *
+from KnotHandler import *
 from skimage import io
 from PyQt5.QtWidgets import QApplication, QMainWindow, QLabel, QGridLayout, QWidget
 from PyQt5.QtGui import QPixmap, QPainter, QColor, QFont, QPen
@@ -20,8 +21,7 @@ class KnotCanvas(QWidget):
         # declare class variables
         self.fileName = fileName
         self.imageData = io.imread(fileName) # get image data with sci-kit
-        self.lf = LineFinder(self.imageData, x=randint(150,450),
-            y=randint(150, 450), degreeRot=randint(0,359), displayType='arrow') # initialize LineFinder
+        self.kh = KnotHandler(self.imageData)
 
         # boilerplate to add image background
         self.im = QPixmap(fileName)
@@ -42,7 +42,8 @@ class KnotCanvas(QWidget):
 
     # boilderplate for a frame update
     def doTick(self):
-        self.tickLogic() # perform each tick logic
+        self.kh.computeTick() # figure out what to do
+        self.kh.performTick() # do it
         self.update() # re-run paintEvent()
 
     # boilerplate to handle frame-by-frame updates
@@ -51,21 +52,19 @@ class KnotCanvas(QWidget):
         self.label.setPixmap(self.im)
         qp = QPainter() # start painting
         qp.begin(self.im)
+        # qp.setRenderHint(QPainter.Antialiasing, True)
+        # qp.setRenderHint(QPainter.SmoothPixmapTransform, True)
         self.draw(qp)
         qp.end()
         self.label.setPixmap(self.im) # update image with painting on top
 
-    # perform the logic for each frame update
-    def tickLogic(self):
-        self.lf.getNextPosition() # set the linefinder's next position # TODO: could make this a linefinder.dotick or something
-
     # paint the stuff each tick
     def draw(self, qp):
-        pen = QPen(Qt.red, 2, Qt.SolidLine)
+        pen = QPen(Qt.black, 2, Qt.SolidLine)
         qp.setPen(pen)
-        self.lf.drawLineFinder(qp) # draw the linefinder
+        self.kh.draw(qp) # draw stuff
 
 if __name__ == '__main__':
     app = QApplication(sys.argv)
-    ex = KnotCanvas('knot.png', 15)
+    ex = KnotCanvas('knot.png', 30)
     sys.exit(app.exec_())
