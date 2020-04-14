@@ -60,8 +60,6 @@ class KnotCanvas(QWidget):
 
     # paint the stuff each tick
     def draw(self, qp):
-        pen = QPen(Qt.black, 2, Qt.SolidLine)
-        qp.setPen(pen)
         self.kh.draw(qp) # draw stuff
 
 if __name__ == '__main__':
