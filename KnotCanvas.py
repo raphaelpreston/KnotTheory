@@ -32,7 +32,7 @@ class KnotCanvas(QWidget):
         self.setLayout(self.grid)
 
         # set window meta info
-        self.setGeometry(200, 150, 1, 1)
+        self.setGeometry(600, 150, 1, 1)
         self.setWindowTitle("Knot Analysis")
         self.show()
 
@@ -52,8 +52,8 @@ class KnotCanvas(QWidget):
         self.label.setPixmap(self.im)
         qp = QPainter() # start painting
         qp.begin(self.im)
-        # qp.setRenderHint(QPainter.Antialiasing, True)
-        # qp.setRenderHint(QPainter.SmoothPixmapTransform, True)
+        qp.setRenderHint(QPainter.Antialiasing, True)
+        qp.setRenderHint(QPainter.SmoothPixmapTransform, True)
         self.draw(qp)
         qp.end()
         self.label.setPixmap(self.im) # update image with painting on top
@@ -64,5 +64,5 @@ class KnotCanvas(QWidget):
 
 if __name__ == '__main__':
     app = QApplication(sys.argv)
-    ex = KnotCanvas('knot.png', 30)
+    ex = KnotCanvas('knot.png', 10000)
     sys.exit(app.exec_())
