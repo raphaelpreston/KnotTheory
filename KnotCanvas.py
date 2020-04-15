@@ -64,5 +64,5 @@ class KnotCanvas(QWidget):
 
 if __name__ == '__main__':
     app = QApplication(sys.argv)
-    ex = KnotCanvas('knot.png', 10000)
+    ex = KnotCanvas('knot.png', 10)
     sys.exit(app.exec_())
