@@ -3,6 +3,7 @@ from random import randint, choice
 from math import sin, cos, radians
 import DrawTools as dtools
 import ImageTools as itools
+from ArcHandler import *
 from PyQt5.QtGui import QPainter, QColor, QPen
 from PyQt5.QtCore import Qt, QTimer
 
@@ -21,13 +22,7 @@ class KnotHandler(): # TODO: delete self variables for certain steps once they'r
 
         # instance variables
         self.status = None
-        self.numCompletedArcs = 0 # number of arcs fully explored
-        self.arcs = [] # index corresponds to pixels in arc
-        self.pixelsToArc = dict() # pixels mapped to arc
-        self.arcBoundaryPixels = [] # boundary pixels of the arcs
-        self.crossings = []
-        self.arcSpines = [] # spines of the arcs
-        self.numCompletedArcSpines = 0 # keep track for painting
+        self.ah = ArcHandler() # TODO: handle coloring too
 
         # triggers
         self.currPixelInArcSearch = None # when searching for arcs
@@ -46,19 +41,18 @@ class KnotHandler(): # TODO: delete self variables for certain steps once they'r
 
         # see if we've hit an arc or done searching
         elif self.status == "arc-search":
-            if self.pixelIsArc(self.currPixelInArcSearch):
-                if self.currPixelInArcSearch not in self.pixelsToArc: # doesn't belong to an arc yet
+            # TODO currPix = self.currPixelInArcSearch
+            if self.pixelIsArc(self.currPixelInArcSearch): 
+                if not self.ah.pixelHasArc(self.currPixelInArcSearch): # doesn't belong to an arc yet
                     self.status = "arc-expand"
                     print("{} at {}".format(self.status, self.currPixelInArcSearch))
-                    # initialize expansion
+                    # initialize BFS expansion
                     self.expansionQueue = [self.currPixelInArcSearch]
                     self.pixelsVisitedInExpansion = set([self.currPixelInArcSearch])
                     self.pixelsToColorInExpansion = [] # color these each step
                     self.boundaryPixelsToColorInExpansion = [self.currPixelInArcSearch]
-                    self.currArcInExpansion = self.numCompletedArcs # start at 0
-                    self.arcs.append([self.currPixelInArcSearch]) # initialize next arc -> pixel data
-                    self.arcBoundaryPixels.append([self.currPixelInArcSearch]) # initialize next arc -> boundary pixel data
-                    self.pixelsToArc[self.currPixelInArcSearch] = self.currArcInExpansion
+                    self.currArcInExpansion = self.ah.numCompletedArcs() # start at 0
+                    self.ah.addPixelToArc(self.currPixelInArcSearch, self.currArcInExpansion, isBoundary=True)
             # check if we're at the last pixel
             if self.currPixelInArcSearch[0] == self.imageWidth-1 and self.currPixelInArcSearch[1] == self.imageHeight - 1:
                 self.status = "done"
@@ -71,12 +65,12 @@ class KnotHandler(): # TODO: delete self variables for certain steps once they'r
         # see if we're done expanding in this arc
         elif self.status == "arc-expand":
             if not self.expansionQueue: # we've run out of arc to expand
-                self.numCompletedArcs += 1
+                self.ah.setCompleted(self.currArcInExpansion)
                 self.status = "arc-search"
                 print(self.status)
-                for arcNum in range(0, self.numCompletedArcs):
-                    print(" - Arc {} has {} pixels.".format(arcNum, len(self.arcs[arcNum])))
-                print(" - Total pixels mapped to an arc: {}".format(len(self.pixelsToArc)))
+                for arcNum in range(0, self.ah.numCompletedArcs()):
+                    print(" - Arc {} has {} pixels.".format(arcNum, len(self.ah.getArcPixels(arcNum))))
+                print(" - Total pixels mapped to an arc: {}".format(len(self.ah.getPixelMappings())))
 
     # do the stuff that we determined we need to do
     def performTick(self):
@@ -88,14 +82,13 @@ class KnotHandler(): # TODO: delete self variables for certain steps once they'r
         elif self.status == "arc-search":
             if ARC_SEARCH_SHORTCUT: # cheat and jump until we hit the end or a new arc
                 print('Shorcut...')
-                print(self.currPixelInArcSearch)
                 while True:
                     thisPixelInSearch = self.currPixelInArcSearch
                     try:
                         self.currPixelInArcSearch = next(self.pixelIterArcSearch)
                         if self.pixelIsArc(self.currPixelInArcSearch):
-                            if self.currPixelInArcSearch not in self.pixelsToArc:
-                                break
+                            if not self.ah.pixelHasArc(self.currPixelInArcSearch):
+                                break # we hit an arc pixel that doesn't belong to an arc
                     except StopIteration:
                         # stay at the last pixel so computeTick knows we're done
                         self.currPixelInArcSearch = thisPixelInSearch
@@ -116,12 +109,14 @@ class KnotHandler(): # TODO: delete self variables for certain steps once they'r
                             self.pixelsVisitedInExpansion.add(n) # visit it
                             if self.isBoundaryPixel(n): # figure out what to color it
                                 self.boundaryPixelsToColorInExpansion.append(n)
-                                self.arcBoundaryPixels[self.currArcInExpansion].append(n) # mark as boundary
+                                self.ah.addPixelToArc(n, self.currArcInExpansion, isBoundary=True)
+                                # self.arcBoundaryPixels[self.currArcInExpansion].append(n) # mark as boundary
                             else:
                                 self.pixelsToColorInExpansion.append(n)
+                                self.ah.addPixelToArc(n, self.currArcInExpansion)
                             self.expansionQueue.append(n) # add it to the queue
-                            self.arcs[self.currArcInExpansion].append(n) # map it under its arc
-                            self.pixelsToArc[n] = self.currArcInExpansion # map it to its arc
+                            # self.arcs[self.currArcInExpansion].append(n) # map it under its arc
+                            # self.pixelsToArc[n] = self.currArcInExpansion # map it to its arc
             else:
                 nextPixel = self.expansionQueue.pop(0)
                 for n in self.getNeighbors(nextPixel):
@@ -129,12 +124,14 @@ class KnotHandler(): # TODO: delete self variables for certain steps once they'r
                         self.pixelsVisitedInExpansion.add(n) # visit it
                         if self.isBoundaryPixel(n): # figure out what to color it
                             self.boundaryPixelsToColorInExpansion.append(n)
-                            self.arcBoundaryPixels[self.currArcInExpansion].append(n) # mark as boundary
+                            self.ah.addPixelToArc(n, self.currArcInExpansion, isBoundary=True)
+                            # self.arcBoundaryPixels[self.currArcInExpansion].append(n) # mark as boundary
                         else:
                             self.pixelsToColorInExpansion.append(n)
+                            self.ah.addPixelToArc(n, self.currArcInExpansion)
                         self.expansionQueue.append(n) # add it to the queue
-                        self.arcs[self.currArcInExpansion].append(n) # map it under its arc
-                        self.pixelsToArc[n] = self.currArcInExpansion # map it to its arc
+                        # self.arcs[self.currArcInExpansion].append(n) # map it under its arc
+                        # self.pixelsToArc[n] = self.currArcInExpansion # map it to its arc
 
     # draws whatever's necessary when it's time to draw
     def draw(self, qp):
@@ -155,13 +152,13 @@ class KnotHandler(): # TODO: delete self variables for certain steps once they'r
         # paint completed arcs
         pen.setColor(Qt.green)
         qp.setPen(pen)
-        for arcNum in range(0, self.numCompletedArcs): # all pixels
-            for pixel in self.arcs[arcNum]:
+        for arcNum in range(0, self.ah.numCompletedArcs()): # all pixels
+            for pixel in self.ah.getArcPixels(arcNum):
                 qp.drawPoint(pixel[0], pixel[1])
         pen.setColor(Qt.red)
         qp.setPen(pen)
-        for arcNum in range(0, self.numCompletedArcs): # boundary pixels
-            for pixel in self.arcBoundaryPixels[arcNum]:
+        for arcNum in range(0, self.ah.numCompletedArcs()): # boundary pixels
+            for pixel in self.ah.getArcPixels(arcNum, boundary=True):
                 qp.drawPoint(pixel[0], pixel[1])
         
         # draw our search pixel on top

@@ -67,10 +67,9 @@ class KnotCanvas(QWidget):
     def draw(self, qp):
         self.kh.draw(qp) # draw stuff
 
-
-def main():
+def main(): # ignore already declared error
     app = QApplication(sys.argv)
-    ex = KnotCanvas('knot.png', 10)
+    ex = KnotCanvas('knot.png', 100000)
     sys.exit(app.exec_())
 
 if __name__ == '__main__':
