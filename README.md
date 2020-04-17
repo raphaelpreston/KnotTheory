@@ -9,3 +9,7 @@
  - For links, the knots might be different colors. Add component functionality
 ## To Connect Endpoints
  - check distance from the endpoints and the intersection (intersection should be relatively equadistant between endpoints)
+
+## Credit:
+# StackOverflow
+ - 

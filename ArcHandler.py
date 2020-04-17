@@ -4,6 +4,7 @@ class ArcHandler:
         self.pixelArcs = dict() # pixel to arc
         self.arcBoundaryPixels = [] # arcs to boundary pixels (list of sets)
         self.arcSpinePixels = [] # arcs to spine pixels (list of sets)
+        self.pixelSpines = dict() # pixel to spine
         self.completedArcs = [] # arcNum -> boolean
 
     # make sure we've allocated space for a new arc
@@ -31,6 +32,9 @@ class ArcHandler:
             self.arcBoundaryPixels[arcNum].add(pixel)
         if isSpine:
             self.arcSpinePixels[arcNum].add(pixel)
+            if pixel in self.pixelSpines and self.pixelSpines[pixel] != arcNum:
+                print('Warning: Reassigning pixel {} from spine {} to spine {}'.format(pixel, self.pixelSpines[pixel], arcNum))
+            self.pixelSpines[pixel] = arcNum
 
     # returns a set of all pixels in an arc
     def getArcPixels(self, arcNum, boundary=False, spine=False):
@@ -47,6 +51,10 @@ class ArcHandler:
     # returns true if a pixel belongs to an arc
     def pixelHasArc(self, pixel):
         return pixel in self.pixelArcs
+    
+    # returns true if a pixel belongs to a spine
+    def pixelHasSpine(self, pixel):
+        return pixel in self.pixelSpines
 
     # returns true if an arc has been marked as complete
     def isComplete(self, arcNum):

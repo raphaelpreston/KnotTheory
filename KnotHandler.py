@@ -9,10 +9,11 @@ from PyQt5.QtCore import Qt, QTimer
 
 ARC_SEARCH_SHORTCUT = True
 ARC_EXPAND_SHORTCUT = True
+SPINE_SEARCH_SHORTCUT = False
 
 class KnotHandler(): # TODO: delete self variables for certain steps once they're done
     
-    def __init__(self, imageData, skelImageData):
+    def __init__(self, imageData, skelImageData, swapImgFunc):
         
         # image data
         self.imageData = imageData
@@ -20,13 +21,12 @@ class KnotHandler(): # TODO: delete self variables for certain steps once they'r
         self.imageWidth = imageData.shape[1]
         self.imageHeight = imageData.shape[0]
 
+        # callback to swap image being displayed from normal to skeleton
+        self.swapImgFunc = swapImgFunc
+
         # instance variables
         self.status = None
         self.ah = ArcHandler() # TODO: handle coloring too
-
-        # triggers
-        self.currPixelInArcSearch = None # when searching for arcs
-        self.doneConstricting = False
 
     # figure out what to do, status should ONLY be set in this function
     def computeTick(self):
@@ -37,6 +37,7 @@ class KnotHandler(): # TODO: delete self variables for certain steps once they'r
             allPixels = [(col, row) for row in range(0, self.imageHeight)
                     for col in range(0, self.imageWidth)]
             self.pixelIterArcSearch = iter(allPixels)
+            self.currPixelInArcSearch = None # don't iter until performTick
             print(self.status)
 
         # see if we've hit an arc or done searching
@@ -55,12 +56,14 @@ class KnotHandler(): # TODO: delete self variables for certain steps once they'r
                     self.ah.addPixelToArc(self.currPixelInArcSearch, self.currArcInExpansion, isBoundary=True)
             # check if we're at the last pixel
             if self.currPixelInArcSearch[0] == self.imageWidth-1 and self.currPixelInArcSearch[1] == self.imageHeight - 1:
-                self.status = "done"
+                print('Hit last pixel')
+                self.status = "spine-search"
                 print(self.status)
-                # print(self.status)
-                # self.currArcInCrossings = 0  # initialize arc crossing discovery
-                # self.pixelsVisitedInArcConstrict = list(self.arcBoundaryPixels[self.currArcConstricting]) # visited all boundaries
-                # self.nextPixelsToConstrict = list(self.arcBoundaryPixels[self.currArcConstricting]) # layer of pixels to shrink inwards
+                self.swapImgFunc() # show skeleton image
+                allPixels = [(col, row) for row in range(0, self.imageHeight)
+                    for col in range(0, self.imageWidth)]
+                self.pixelIterSpineSearch = iter(allPixels)
+                self.currPixelInSpineSearch = None # don't iter until performTick()
 
         # see if we're done expanding in this arc
         elif self.status == "arc-expand":
@@ -71,6 +74,28 @@ class KnotHandler(): # TODO: delete self variables for certain steps once they'r
                 for arcNum in range(0, self.ah.numCompletedArcs()):
                     print(" - Arc {} has {} pixels.".format(arcNum, len(self.ah.getArcPixels(arcNum))))
                 print(" - Total pixels mapped to an arc: {}".format(len(self.ah.getPixelMappings())))
+
+        # see if we hit a spine or done searching
+        elif self.status == "spine-search":
+            # TODO currPix = self.currPixelInArcSearch
+            if self.pixelIsSpine(self.currPixelInSpineSearch): 
+                if not self.ah.pixelHasSpine(self.currPixelInArcSearch): # doesn't belong to a spine yet
+                    self.status = "spine-map"
+                    print("{} at {}".format(self.status, self.currPixelInSpineSearch))
+                    # initialize spine mapping
+                    self.status = "done"
+                    print(self.status)
+                    # self.expansionQueue = [self.currPixelInArcSearch]
+                    # self.pixelsVisitedInExpansion = set([self.currPixelInArcSearch])
+                    # self.pixelsToColorInExpansion = [] # color these each step
+                    # self.boundaryPixelsToColorInExpansion = [self.currPixelInArcSearch]
+                    # self.currArcInExpansion = self.ah.numCompletedArcs() # start at 0
+                    # self.ah.addPixelToArc(self.currPixelInArcSearch, self.currArcInExpansion, isBoundary=True)
+            # check if we're at the last pixel
+            if self.currPixelInSpineSearch[0] == self.imageWidth-1 and self.currPixelInSpineSearch[1] == self.imageHeight - 1:
+                print('Hit last pixel')
+                self.status = "done"
+                print(self.status)
 
     # do the stuff that we determined we need to do
     def performTick(self):
@@ -96,6 +121,27 @@ class KnotHandler(): # TODO: delete self variables for certain steps once they'r
             else:
                 try:
                     self.currPixelInArcSearch = next(self.pixelIterArcSearch)
+                except StopIteration:
+                    print("Error: We finished iteration in performTick...")
+        
+        # move our cursor in the search for spines
+        elif self.status == "spine-search":
+            if SPINE_SEARCH_SHORTCUT: # cheat and jump to closest spine or last pix
+                print('Shortcut...')
+                while True:
+                    thisPixelInSearch = self.currPixelInSpineSearch
+                    try:
+                        self.currPixelInSpineSearch = next(self.pixelIterSpineSearch)
+                        if self.pixelIsSpine(self.currPixelInSpineSearch):
+                            if not self.ah.pixelHasSpine(self.currPixelInSpineSearch):
+                                break # we hit a spine pixel that doesn't belong to a spine yet
+                    except StopIteration:
+                        # stay at the last pixel so computeTick knows we're done
+                        self.currPixelInSpineSearch = thisPixelInSearch
+                        break
+            else:
+                try:
+                    self.currPixelInSpineSearch = next(self.pixelIterSpineSearch)
                 except StopIteration:
                     print("Error: We finished iteration in performTick...")
         
@@ -150,29 +196,41 @@ class KnotHandler(): # TODO: delete self variables for certain steps once they'r
                 qp.drawPoint(pixel[0], pixel[1])
 
         # paint completed arcs
-        pen.setColor(Qt.green)
-        qp.setPen(pen)
-        for arcNum in range(0, self.ah.numCompletedArcs()): # all pixels
-            for pixel in self.ah.getArcPixels(arcNum):
-                qp.drawPoint(pixel[0], pixel[1])
-        pen.setColor(Qt.red)
-        qp.setPen(pen)
-        for arcNum in range(0, self.ah.numCompletedArcs()): # boundary pixels
-            for pixel in self.ah.getArcPixels(arcNum, boundary=True):
-                qp.drawPoint(pixel[0], pixel[1])
+        if self.status != 'spine-search' and self.status != 'spine-map' and self.status != 'done':
+            pen.setColor(Qt.green)
+            qp.setPen(pen)
+            for arcNum in range(0, self.ah.numCompletedArcs()): # all pixels
+                for pixel in self.ah.getArcPixels(arcNum):
+                    qp.drawPoint(pixel[0], pixel[1])
+            pen.setColor(Qt.red)
+            qp.setPen(pen)
+            for arcNum in range(0, self.ah.numCompletedArcs()): # boundary pixels
+                for pixel in self.ah.getArcPixels(arcNum, boundary=True):
+                    qp.drawPoint(pixel[0], pixel[1])
         
-        # draw our search pixel on top
-        if self.currPixelInArcSearch is not None: # first time it'll be None
+        # draw our arc search pixel on top
+        if hasattr(self, 'currPixelInArcSearch') and self.currPixelInArcSearch is not None: # first time it'll be None
             pen.setColor(Qt.black)
             qp.setPen(pen)
             qp.drawPoint(self.currPixelInArcSearch[0], self.currPixelInArcSearch[1])
-
+        
+        # draw our spine search pixel on top
+        if hasattr(self, 'currPixelInSpineSearch') and self.currPixelInSpineSearch is not None:
+            pen.setColor(Qt.white)
+            qp.setPen(pen)
+            qp.drawPoint(self.currPixelInSpineSearch[0], self.currPixelInSpineSearch[1])
 
     def pixelIsArc(self, pixel):
         row = pixel[1]
         col = pixel[0]
         pixelColor = tuple(self.imageData[row][col][0:3]) # ommit alpha channel
         return pixelColor != (255, 255, 255) # if it's not white
+    
+    def pixelIsSpine(self, pixel):
+        row = pixel[1]
+        col = pixel[0]
+        pixelWhite = self.skelImageData[row][col] # binary image data
+        return pixelWhite
 
     # get the valid neighbors of a given pixel
     def getNeighbors(self, pixel):
