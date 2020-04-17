@@ -11,10 +11,11 @@ ARC_EXPAND_SHORTCUT = True
 
 class KnotHandler(): # TODO: delete self variables for certain steps once they're done
     
-    def __init__(self, imageData):
+    def __init__(self, imageData, skelImageData):
         
         # image data
         self.imageData = imageData
+        self.skelImageData = skelImageData
         self.imageWidth = imageData.shape[1]
         self.imageHeight = imageData.shape[0]
 
@@ -60,27 +61,12 @@ class KnotHandler(): # TODO: delete self variables for certain steps once they'r
                     self.pixelsToArc[self.currPixelInArcSearch] = self.currArcInExpansion
             # check if we're at the last pixel
             if self.currPixelInArcSearch[0] == self.imageWidth-1 and self.currPixelInArcSearch[1] == self.imageHeight - 1:
-                self.status = "arc-constrict"
+                self.status = "done"
                 print(self.status)
-                self.currArcConstricting = 0 # initialize arc constriction
-                self.pixelsVisitedInArcConstrict = list(self.arcBoundaryPixels[self.currArcConstricting]) # visited all boundaries
-                self.nextPixelsToConstrict = list(self.arcBoundaryPixels[self.currArcConstricting]) # layer of pixels to shrink inwards
-
-        # check to see if it's time to constrict the next arc
-        elif self.status == "arc-constrict":
-            if self.doneConstricting:
-                print('done constricting this arc')
-                self.arcSpines.append(list(self.nextPixelsToConstrict))
-                self.numCompletedArcSpines += 1
-                print('That arc had {} pixels in its spine'.format(len(self.nextPixelsToConstrict)))
-                if self.currArcConstricting == len(self.arcs) - 1: # all arcs constricted
-                    self.status = "done"
-                    print(self.status)
-                else: # reset to next arc
-                    self.currArcConstricting += 1
-                    self.pixelsVisitedInArcConstrict = list(self.arcBoundaryPixels[self.currArcConstricting]) # visited all boundaries
-                    self.nextPixelsToConstrict = list(self.arcBoundaryPixels[self.currArcConstricting]) # layer of pixels to shrink inwards
-                    self.doneConstricting = False
+                # print(self.status)
+                # self.currArcInCrossings = 0  # initialize arc crossing discovery
+                # self.pixelsVisitedInArcConstrict = list(self.arcBoundaryPixels[self.currArcConstricting]) # visited all boundaries
+                # self.nextPixelsToConstrict = list(self.arcBoundaryPixels[self.currArcConstricting]) # layer of pixels to shrink inwards
 
         # see if we're done expanding in this arc
         elif self.status == "arc-expand":
@@ -149,21 +135,6 @@ class KnotHandler(): # TODO: delete self variables for certain steps once they'r
                         self.expansionQueue.append(n) # add it to the queue
                         self.arcs[self.currArcInExpansion].append(n) # map it under its arc
                         self.pixelsToArc[n] = self.currArcInExpansion # map it to its arc
-        
-        # take a step in BFS to constict an arc
-        elif self.status == "arc-constrict":
-            toAnalyze = list(self.nextPixelsToConstrict)
-            self.nextPixelsToConstrict = []
-            x = 0
-            for pixel in toAnalyze:
-                for n in self.getNeighbors(pixel):
-                    if n in self.arcs[self.currArcConstricting]: # in our arc
-                        if n not in self.pixelsVisitedInArcConstrict: # not constricted yet
-                            self.pixelsVisitedInArcConstrict.append(n) # visit it
-                            self.nextPixelsToConstrict.append(n) # part of next layer
-            if len(self.nextPixelsToConstrict) == 0: # can't constrict tighter
-                self.nextPixelsToConstrict = list(toAnalyze) # at least paint these
-                self.doneConstricting = True
 
     # draws whatever's necessary when it's time to draw
     def draw(self, qp):
@@ -182,10 +153,7 @@ class KnotHandler(): # TODO: delete self variables for certain steps once they'r
                 qp.drawPoint(pixel[0], pixel[1])
 
         # paint completed arcs
-        if self.status != "done":
-            pen.setColor(Qt.green)
-        else:
-            pen.setColor(Qt.white)
+        pen.setColor(Qt.green)
         qp.setPen(pen)
         for arcNum in range(0, self.numCompletedArcs): # all pixels
             for pixel in self.arcs[arcNum]:
@@ -194,23 +162,6 @@ class KnotHandler(): # TODO: delete self variables for certain steps once they'r
         qp.setPen(pen)
         for arcNum in range(0, self.numCompletedArcs): # boundary pixels
             for pixel in self.arcBoundaryPixels[arcNum]:
-                qp.drawPoint(pixel[0], pixel[1])
-
-        # draw completed spines
-        if self.status != "done":
-            pen.setColor(Qt.yellow)
-        else:
-            pen.setColor(Qt.green)
-        qp.setPen(pen)
-        for arcNum in range(0, self.numCompletedArcSpines):
-            for pixel in self.arcSpines[arcNum]:
-                qp.drawPoint(pixel[0], pixel[1])
-        
-        # draw current arc constriction
-        if self.status == "arc-constrict":
-            pen.setColor(Qt.black)
-            qp.setPen(pen)
-            for pixel in self.nextPixelsToConstrict:
                 qp.drawPoint(pixel[0], pixel[1])
         
         # draw our search pixel on top
@@ -251,3 +202,8 @@ class KnotHandler(): # TODO: delete self variables for certain steps once they'r
             col = n[0]
             neighborColors.append(tuple(self.imageData[row][col][0:3])) # ommit alpha channel
         return any([color == (255,255,255) for color in neighborColors])
+
+
+if __name__ == "__main__":
+    from KnotCanvas import main
+    main()

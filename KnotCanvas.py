@@ -6,7 +6,7 @@ from math import sin, cos, radians
 from random import randint
 from LineFinder import *
 from KnotHandler import *
-from skimage import io
+from skimage import io, color, morphology, img_as_float
 from PyQt5.QtWidgets import QApplication, QMainWindow, QLabel, QGridLayout, QWidget
 from PyQt5.QtGui import QPixmap, QPainter, QColor, QFont, QPen
 from PyQt5.QtCore import Qt, QTimer
@@ -18,10 +18,15 @@ class KnotCanvas(QWidget):
     def __init__(self, fileName, tickFPS):
         super().__init__()
 
+        # skeletonize image
+        image = img_as_float(color.rgb2gray(io.imread('knot.png')))
+        image_binary = image < 0.5
+        self.skelImageData = morphology.skeletonize(image_binary)
+
         # declare class variables
         self.fileName = fileName
         self.imageData = io.imread(fileName) # get image data with sci-kit
-        self.kh = KnotHandler(self.imageData)
+        self.kh = KnotHandler(self.imageData, self.skelImageData)
 
         # boilerplate to add image background
         self.im = QPixmap(fileName)
@@ -62,7 +67,11 @@ class KnotCanvas(QWidget):
     def draw(self, qp):
         self.kh.draw(qp) # draw stuff
 
-if __name__ == '__main__':
+
+def main():
     app = QApplication(sys.argv)
     ex = KnotCanvas('knot.png', 10)
     sys.exit(app.exec_())
+
+if __name__ == '__main__':
+    main()
