@@ -6,10 +6,12 @@ import ImageTools as itools
 from ArcHandler import *
 from PyQt5.QtGui import QPainter, QColor, QPen
 from PyQt5.QtCore import Qt, QTimer
+from colour import Color
 
 ARC_SEARCH_SHORTCUT = True
 ARC_EXPAND_SHORTCUT = True
-SPINE_SEARCH_SHORTCUT = True
+SPINE_SEARCH_SHORTCUT = False
+# todo: add spine-map shortcut
 
 class KnotHandler(): # TODO: delete self variables for certain steps once they're done
     
@@ -27,6 +29,12 @@ class KnotHandler(): # TODO: delete self variables for certain steps once they'r
         # instance variables
         self.status = None
         self.ah = ArcHandler() # TODO: handle coloring too
+
+        # declare for persistence purposes
+        self.arcsCompletedInArcExpansion = []
+        self.arcsCompletedInSpineMapping = []
+        self.currArcInExpansion = 0
+        # self.currArcInSpineMap = 0
 
     # figure out what to do, status should ONLY be set in this function
     def computeTick(self):
@@ -52,7 +60,6 @@ class KnotHandler(): # TODO: delete self variables for certain steps once they'r
                     self.pixelsVisitedInExpansion = set([self.currPixelInArcSearch])
                     self.pixelsToColorInExpansion = [] # color these each step
                     self.boundaryPixelsToColorInExpansion = [self.currPixelInArcSearch]
-                    self.currArcInExpansion = self.ah.numCompletedArcs() # start at 0
                     self.ah.addPixelToArc(self.currPixelInArcSearch, self.currArcInExpansion, isBoundary=True)
             # check if we're at the last pixel
             if self.currPixelInArcSearch[0] == self.imageWidth-1 and self.currPixelInArcSearch[1] == self.imageHeight - 1:
@@ -68,23 +75,14 @@ class KnotHandler(): # TODO: delete self variables for certain steps once they'r
         # see if we're done expanding in this arc
         elif self.status == "arc-expand":
             if not self.expansionQueue: # we've run out of arc to expand
-                self.ah.setCompleted(self.currArcInExpansion)
+                self.arcsCompletedInArcExpansion.append(self.currArcInExpansion)
+                print('Expanded arc {}'.format(self.currArcInExpansion))
+                self.currArcInExpansion += 1
                 self.status = "arc-search"
                 print(self.status)
-                for arcNum in range(0, self.ah.numCompletedArcs()):
+                for arcNum in self.arcsCompletedInArcExpansion:
                     print(" - Arc {} has {} pixels.".format(arcNum, len(self.ah.getArcPixels(arcNum))))
                 print(" - Total pixels mapped to an arc: {}".format(len(self.ah.getPixelMappings())))
-
-        # see if we're done mapping this spine
-        # see if we're done expanding in this arc
-        elif self.status == "spine-map":
-            if not self.spineMapQueue: # we've run out of spine to map
-                # self.ah.setCompleted(self.currArcInExpansion)
-                self.status = "done" # TODO: for now, we finish after mapping one
-                # todo: show establishment of order(gradient?)
-                print(self.status)
-                # self.ah.printSpineTree(0) # get arc 0's ordered spine
-                self.ah.getSpineEndPoints(0)
 
         # see if we hit a spine or done searching
         elif self.status == "spine-search":
@@ -92,10 +90,10 @@ class KnotHandler(): # TODO: delete self variables for certain steps once they'r
             if self.pixelIsSpine(self.currPixelInSpineSearch): 
                 if not self.ah.pixelHasSpine(self.currPixelInArcSearch): # doesn't belong to a spine yet
                     self.status = "spine-map"
-                    print("{} at {}".format(self.status, self.currPixelInSpineSearch))
+                    self.currArcInSpineMap = self.ah.getPixelArc(self.currPixelInSpineSearch)
+                    print("{} at {}, belongs to arc {}".format(self.status, self.currPixelInSpineSearch, self.currArcInSpineMap))
                     self.status = "spine-map" # initialize spine mapping
                     print(self.status)
-                    self.currArcInSpineMap = 0
                     self.spineMapQueue = [self.currPixelInSpineSearch]
                     self.pixelsVisitedInSpineMapping = set([self.currPixelInSpineSearch]) # make sure we go away from where we started
                     self.spineMapPosDir = set() # spine pixels that go in the positive direction
@@ -105,6 +103,17 @@ class KnotHandler(): # TODO: delete self variables for certain steps once they'r
                 print('Hit last pixel')
                 self.status = "done"
                 print(self.status)
+        elif self.status == "spine-map":
+            if not self.spineMapQueue: # we've run out of spine to map
+                # self.ah.setCompleted(self.currArcInExpansion)
+                self.arcsCompletedInSpineMapping.append(self.currArcInSpineMap)
+                self.status = "spine-search"
+                print(self.status)
+                # self.ah.printSpineTree(0) # get arc 0's ordered spine
+                print('Completed spine {}'.format(self.currArcInSpineMap))
+                self.ah.getSpineEndPoints(self.currArcInSpineMap)
+                # currArcInSpineMap comes from when we find a pixel that has a
+                # spine, so no need to increment it
 
     # do the stuff that we determined we need to do
     def performTick(self):
@@ -165,7 +174,6 @@ class KnotHandler(): # TODO: delete self variables for certain steps once they'r
                             if self.isBoundaryPixel(n): # figure out what to color it
                                 self.boundaryPixelsToColorInExpansion.append(n)
                                 self.ah.addPixelToArc(n, self.currArcInExpansion, isBoundary=True)
-                                # self.arcBoundaryPixels[self.currArcInExpansion].append(n) # mark as boundary
                             else:
                                 self.pixelsToColorInExpansion.append(n)
                                 self.ah.addPixelToArc(n, self.currArcInExpansion)
@@ -187,6 +195,9 @@ class KnotHandler(): # TODO: delete self variables for certain steps once they'r
         # take a step in spine mapping
         elif self.status == 'spine-map': # TODO: change this expansion and arc expansion to be batch-by-batch, not one at a time (empty whole next ups at once)
             currPixel = self.spineMapQueue.pop(0)
+            # begin by noting this newfound pixel
+            self.ah.setPixelAsSpine(currPixel) # assume already in arc
+            self.pixelsVisitedInSpineMapping.add(currPixel)
             # get neighbors and error check
             allNeighbors = self.getNeighbors(currPixel)
             neighborsOnSpine = [n for n in allNeighbors if self.pixelIsSpine(n)]
@@ -195,7 +206,6 @@ class KnotHandler(): # TODO: delete self variables for certain steps once they'r
                     return
             # initialize directions if necessary (implies no spine pixels are visited yet)
             if len(self.spineMapPosDir) == 0 and len(self.spineMapNegDir) == 0:
-                print('Initializing directions')
                 if len(neighborsOnSpine) == 2:
                     # choose one direction to be positive and one to be negative
                     self.spineMapPosDir.add(neighborsOnSpine[0])
@@ -203,12 +213,10 @@ class KnotHandler(): # TODO: delete self variables for certain steps once they'r
                 elif len(neighborsOnSpine) == 1:
                     # we must have hit an actual endpoint
                     self.spineMapPosDir.add(neighborsOnSpine[0])
-                print('posDir is now {}'.format(self.spineMapPosDir))
-                print('negDir is now {}'.format(self.spineMapNegDir))
-                print('adding neighbors to queue')
                 for p in neighborsOnSpine:
                     self.spineMapQueue.append(p) # add to queue
                     self.pixelsVisitedInSpineMapping.add(p) # mark as visited
+                    self.ah.setPixelAsSpine(p) # assume pixel already in arc
                     # set their neighbors accordingly
                     if p in self.spineMapPosDir:
                         self.ah.setPositionInSpine(currPixel, nxt=p)
@@ -218,7 +226,6 @@ class KnotHandler(): # TODO: delete self variables for certain steps once they'r
                         self.ah.setPositionInSpine(p, nxt=currPixel)
                     else:
                         print("Error: First pixel found on spine wasn't assigned position")
-                print('queue is now {}'.format(self.spineMapQueue))
             else: # directions already initialized
                 neighborsInMyDirection = [n for n in neighborsOnSpine
                         if n not in self.pixelsVisitedInSpineMapping]
@@ -261,12 +268,12 @@ class KnotHandler(): # TODO: delete self variables for certain steps once they'r
         if self.status != 'spine-search' and self.status != 'spine-map' and self.status != 'done':
             pen.setColor(Qt.green)
             qp.setPen(pen)
-            for arcNum in range(0, self.ah.numCompletedArcs()): # all pixels
+            for arcNum in self.arcsCompletedInArcExpansion: # all pixels
                 for pixel in self.ah.getArcPixels(arcNum):
                     qp.drawPoint(pixel[0], pixel[1])
             pen.setColor(Qt.red)
             qp.setPen(pen)
-            for arcNum in range(0, self.ah.numCompletedArcs()): # boundary pixels
+            for arcNum in self.arcsCompletedInArcExpansion: # boundary pixels
                 for pixel in self.ah.getArcPixels(arcNum, boundary=True):
                     qp.drawPoint(pixel[0], pixel[1])
         
@@ -288,6 +295,23 @@ class KnotHandler(): # TODO: delete self variables for certain steps once they'r
                 pen.setColor(Qt.red)
                 qp.setPen(pen)
                 qp.drawPoint(pixel[0], pixel[1])
+        
+        # draw completed spines
+        if len(self.arcsCompletedInSpineMapping) > 0:
+            for arcNum in self.arcsCompletedInSpineMapping:
+                for pixel in self.ah.getArcPixels(arcNum, spine=True):
+                    pen.setColor(Qt.green)
+                    qp.setPen(pen)
+                    qp.drawPoint(pixel[0], pixel[1])
+        
+        # draw endpoints on top # todo: temporary, add gradient between endpoints
+        if self.status == "done":
+            for arcNum in self.arcsCompletedInSpineMapping:
+                for pixel in self.ah.getSpineEndPoints(arcNum):
+                    pen.setColor(Qt.blue)
+                    qp.setPen(pen)
+                    qp.drawPoint(pixel[0], pixel[1])
+
 
     def pixelIsArc(self, pixel):
         row = pixel[1]

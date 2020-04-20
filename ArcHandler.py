@@ -5,7 +5,6 @@ class ArcHandler:
         self.arcBoundaryPixels = [] # arcs to boundary pixels (list of sets)
         self.arcSpinePixels = [] # arcs to spine pixels (list of sets)
         self.pixelSpines = dict() # pixel to spine
-        self.completedArcs = [] # arcNum -> boolean
         self.spineTrees = [] # for each arc, dict maps pixel => {prev => [], next => []}
 
     # make sure we've allocated space for a new arc
@@ -15,7 +14,6 @@ class ArcHandler:
             self.arcPixels.append(set())
             self.arcBoundaryPixels.append(set())
             self.arcSpinePixels.append(set())
-            self.completedArcs.append(False)
             self.spineTrees.append(dict())
 
     # use this to add a pixel to arc or set it as boundary or spine
@@ -32,12 +30,26 @@ class ArcHandler:
         self.arcPixels[arcNum].add(pixel)
         self.pixelArcs[pixel] = arcNum
         if isBoundary:
-            self.arcBoundaryPixels[arcNum].add(pixel)
+            self.setPixelAsBoundary(pixel)
         if isSpine:
-            self.arcSpinePixels[arcNum].add(pixel)
-            if pixel in self.pixelSpines and self.pixelSpines[pixel] != arcNum:
-                print('Warning: Reassigning pixel {} from spine {} to spine {}'.format(pixel, self.pixelSpines[pixel], arcNum))
-            self.pixelSpines[pixel] = arcNum
+            self.setPixelAsSpine(pixel)
+        
+    def setPixelAsBoundary(self, pixel):
+        arcNum = self.getPixelArc(pixel)
+        if arcNum is None:
+            print("Error: Pixel {} doesn't have an arc".format(pixel))
+        self.forceArcInitialized(arcNum) # ensure initialized
+        self.arcBoundaryPixels[arcNum].add(pixel)
+
+    # useful for when finding spines b/c the order in which spines are found
+    # isn't necessarily the same order in which the arcs were found
+    def setPixelAsSpine(self, pixel):
+        arcNum = self.getPixelArc(pixel)
+        if arcNum is None:
+            print("Error: Pixel {} doesn't have an arc".format(pixel))
+        self.forceArcInitialized(arcNum) # ensure initialized
+        self.arcSpinePixels[arcNum].add(pixel) # arc => pixel
+        self.pixelSpines[pixel] = arcNum # pixel => arc
 
     # set a pixel's relative position in its (implied) arc's spine
     # use this to set initial position in spine or edit it later
@@ -101,6 +113,7 @@ class ArcHandler:
         ones = [] # pixels with one neighbor
         twos = [] # pixels with two neighbors
         others = [] # pixels with >2 neighbors
+
         for pixel, data in self.spineTrees[arcNum].items():
             allNeighbors = data['prev'] + data['next']
             l = len(allNeighbors)
@@ -110,13 +123,15 @@ class ArcHandler:
                 twos.append(pixel)
             else:
                 others.append(pixel)
-        print('Ones: {}'.format(len(ones)))
-        print(ones)
-        print('Twos: {}'.format(len(twos)))
-        print('Others: {}'.format(len(others)))
+        # print(' - # pixels w/ one neighbor: {}'.format(len(ones)))
+        # print(' - # pixels w/ two neighbors: {}'.format(len(twos)))
+        if len(others) > 0: # sanity check for skeletonization
+            print("Warning: Arc {} has {} pixels with more than two neighbors"
+                .format(arcNum, len(others)))
+        return ones
         
-
-
+        
+        
     # print spine tree
     def printSpineTree(self, arcNum):
         print(self.spineTrees[arcNum]) # todo, print ordered tree from an endpoint
@@ -140,6 +155,7 @@ class ArcHandler:
     
     # returns the arc number of a given pixel
     def getPixelArc(self, pixel):
+        return self.pixelArcs[pixel]
         if self.pixelHasArc(pixel):
             return self.pixelArcs[pixel]
         else:
@@ -149,19 +165,6 @@ class ArcHandler:
     def pixelHasSpine(self, pixel):
         return pixel in self.pixelSpines
 
-    # returns true if an arc has been marked as complete
-    def isComplete(self, arcNum):
-        if arcNum >= len(self.arcPixels):
-            print("Error: Arc doesn't exist yet")
-            return
-        return self.completedArcs[arcNum]
-    
-    # set an arc as completed
-    def setCompleted(self, arcNum):
-        self.completedArcs[arcNum] = True
-
-    def numCompletedArcs(self):
-        return self.completedArcs.count(True)
 
 if __name__ == "__main__":
     from KnotCanvas import main
