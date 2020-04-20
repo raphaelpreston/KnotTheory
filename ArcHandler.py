@@ -56,9 +56,9 @@ class ArcHandler:
         
         # insert all relevent values
         if prev is not None:
-            arcSpineTree[pixel]['prev'] = prev
+            arcSpineTree[pixel]['prev'].append(prev)
         if nxt is not None:
-            arcSpineTree[pixel]['next'] = nxt
+            arcSpineTree[pixel]['next'].append(nxt)
 
     # return the array of next/prev pixels in a given spine pixel
     # returns None if pixel position not set yet with setPositionInSpine
@@ -89,6 +89,33 @@ class ArcHandler:
 
     def getPrevSpinePixels(self, pixel):
         return self._getSpineNeighbors(pixel, "prev")
+
+    def getSpineEndPoints(self, arcNum):
+        if arcNum is None:
+            print("Error: Arcnum is None")
+            return
+        if arcNum >= len(self.arcPixels): # not initalized with forceInitialized
+            print("Error: Arc {} hasn't been initialized yet")
+            return
+        # return end points
+        ones = [] # pixels with one neighbor
+        twos = [] # pixels with two neighbors
+        others = [] # pixels with >2 neighbors
+        for pixel, data in self.spineTrees[arcNum].items():
+            allNeighbors = data['prev'] + data['next']
+            l = len(allNeighbors)
+            if l == 1:
+                ones.append(pixel)
+            elif l == 2:
+                twos.append(pixel)
+            else:
+                others.append(pixel)
+        print('Ones: {}'.format(len(ones)))
+        print(ones)
+        print('Twos: {}'.format(len(twos)))
+        print('Others: {}'.format(len(others)))
+        
+
 
     # print spine tree
     def printSpineTree(self, arcNum):

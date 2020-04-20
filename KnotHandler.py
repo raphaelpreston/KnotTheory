@@ -83,7 +83,8 @@ class KnotHandler(): # TODO: delete self variables for certain steps once they'r
                 self.status = "done" # TODO: for now, we finish after mapping one
                 # todo: show establishment of order(gradient?)
                 print(self.status)
-                self.ah.printSpineTree(0) # get arc 0's ordered spine
+                # self.ah.printSpineTree(0) # get arc 0's ordered spine
+                self.ah.getSpineEndPoints(0)
 
         # see if we hit a spine or done searching
         elif self.status == "spine-search":
@@ -186,14 +187,12 @@ class KnotHandler(): # TODO: delete self variables for certain steps once they'r
         # take a step in spine mapping
         elif self.status == 'spine-map': # TODO: change this expansion and arc expansion to be batch-by-batch, not one at a time (empty whole next ups at once)
             currPixel = self.spineMapQueue.pop(0)
-            
             # get neighbors and error check
             allNeighbors = self.getNeighbors(currPixel)
             neighborsOnSpine = [n for n in allNeighbors if self.pixelIsSpine(n)]
             if len(neighborsOnSpine) > 2 or len(neighborsOnSpine) < 1:
                     print('Error: Pixel {} had more than two or less than one neighbor(s): {}'.format(currPixel, neighborsOnSpine))
                     return
-
             # initialize directions if necessary (implies no spine pixels are visited yet)
             if len(self.spineMapPosDir) == 0 and len(self.spineMapNegDir) == 0:
                 print('Initializing directions')
@@ -204,13 +203,21 @@ class KnotHandler(): # TODO: delete self variables for certain steps once they'r
                 elif len(neighborsOnSpine) == 1:
                     # we must have hit an actual endpoint
                     self.spineMapPosDir.add(neighborsOnSpine[0])
-                # add pixels in both directions to queue and mark as visited
                 print('posDir is now {}'.format(self.spineMapPosDir))
                 print('negDir is now {}'.format(self.spineMapNegDir))
                 print('adding neighbors to queue')
                 for p in neighborsOnSpine:
-                    self.spineMapQueue.append(p)
-                    self.pixelsVisitedInSpineMapping.add(p)
+                    self.spineMapQueue.append(p) # add to queue
+                    self.pixelsVisitedInSpineMapping.add(p) # mark as visited
+                    # set their neighbors accordingly
+                    if p in self.spineMapPosDir:
+                        self.ah.setPositionInSpine(currPixel, nxt=p)
+                        self.ah.setPositionInSpine(p, prev=currPixel)
+                    elif p in self.spineMapNegDir:
+                        self.ah.setPositionInSpine(currPixel, prev=p)
+                        self.ah.setPositionInSpine(p, nxt=currPixel)
+                    else:
+                        print("Error: First pixel found on spine wasn't assigned position")
                 print('queue is now {}'.format(self.spineMapQueue))
             else: # directions already initialized
                 neighborsInMyDirection = [n for n in neighborsOnSpine
@@ -218,16 +225,12 @@ class KnotHandler(): # TODO: delete self variables for certain steps once they'r
                 # there might be more than one neighbor (like at a fork)
                 for nextPixel in neighborsInMyDirection:
                     if currPixel in self.spineMapPosDir:
-                        # set this pixel's next pixel as nextPixel
                         self.ah.setPositionInSpine(currPixel, nxt=nextPixel)
-                        # set next pixel's prev pixel as currPixel
                         self.ah.setPositionInSpine(nextPixel, prev=currPixel)
                         # continue in same direction
                         self.spineMapPosDir.add(nextPixel)
                     elif currPixel in self.spineMapNegDir:
-                        # set this pixel's prev pixel as nextPixel
                         self.ah.setPositionInSpine(currPixel, prev=nextPixel)
-                        # set next pixel's next pixel as currPixel
                         self.ah.setPositionInSpine(nextPixel, nxt=currPixel)
                         # continue in same direction
                         self.spineMapNegDir.add(nextPixel)
