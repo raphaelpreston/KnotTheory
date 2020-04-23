@@ -1,3 +1,5 @@
+from colour import Color
+
 class ArcHandler:
     def __init__(self):
         self.arcPixels = [] # arcs to pixels (list of sets)
@@ -6,6 +8,7 @@ class ArcHandler:
         self.arcSpinePixels = [] # arcs to spine pixels (list of sets)
         self.pixelSpines = dict() # pixel to spine
         self.spineTrees = [] # for each arc, dict maps pixel => {prev => [], next => []}
+        self.spineEndPoints = [] # for each arc, list of endpoints
 
     # make sure we've allocated space for a new arc
     def forceArcInitialized(self, arcNum):
@@ -15,6 +18,7 @@ class ArcHandler:
             self.arcBoundaryPixels.append(set())
             self.arcSpinePixels.append(set())
             self.spineTrees.append(dict())
+            self.spineEndPoints.append(None)
 
     # use this to add a pixel to arc or set it as boundary or spine
     def addPixelToArc(self, pixel, arcNum, isBoundary=False, isSpine=False):
@@ -48,6 +52,7 @@ class ArcHandler:
         if arcNum is None:
             print("Error: Pixel {} doesn't have an arc".format(pixel))
         self.forceArcInitialized(arcNum) # ensure initialized
+        self.spineEndPoints[arcNum] = None # reset endpoints
         self.arcSpinePixels[arcNum].add(pixel) # arc => pixel
         self.pixelSpines[pixel] = arcNum # pixel => arc
 
@@ -60,6 +65,9 @@ class ArcHandler:
         
         # ensure arc is initialized
         self.forceArcInitialized(arcNum)
+
+        # reset endpoints for spine
+        self.spineEndPoints[arcNum] = None
 
         # initialize pixel's position entry if necessary
         arcSpineTree = self.spineTrees[arcNum]
@@ -109,11 +117,13 @@ class ArcHandler:
         if arcNum >= len(self.arcPixels): # not initalized with forceInitialized
             print("Error: Arc {} hasn't been initialized yet")
             return
-        # return end points
+        # if end points were already computed, retreive them
+        if self.spineEndPoints[arcNum] is not None:
+            return self.spineEndPoints[arcNum]
+        # otherwise do the work and save them for later use
         ones = [] # pixels with one neighbor
         twos = [] # pixels with two neighbors
         others = [] # pixels with >2 neighbors
-
         for pixel, data in self.spineTrees[arcNum].items():
             allNeighbors = data['prev'] + data['next']
             l = len(allNeighbors)
@@ -123,14 +133,60 @@ class ArcHandler:
                 twos.append(pixel)
             else:
                 others.append(pixel)
-        # print(' - # pixels w/ one neighbor: {}'.format(len(ones)))
-        # print(' - # pixels w/ two neighbors: {}'.format(len(twos)))
+        print(' - # pixels w/ one neighbor: {}'.format(len(ones)))
+        print(' - # pixels w/ two neighbors: {}'.format(len(twos)))
         if len(others) > 0: # sanity check for skeletonization
             print("Warning: Arc {} has {} pixels with more than two neighbors"
                 .format(arcNum, len(others)))
+        # save for later use
+        self.spineEndPoints[arcNum] = list(ones)
         return ones
         
-        
+    # return pixels, colors for a spine map in order to display a color
+    # gradient in all distinct lines (to show endpoints)
+    def getSpinePaintMap(self, arcNum):
+        spinePixels = self.getArcPixels(arcNum, spine=True)
+        endPoints = self.getSpineEndPoints(arcNum)
+        heads = [p for p in endPoints if self._getSpineNeighbors(p, 'next')]
+        joints = [p for p in spinePixels
+            if len(self._getSpineNeighbors(p, 'prev') + self._getSpineNeighbors(p, 'next')) > 2]
+
+        # for a bunch of distinct lines
+        if len(joints) == 0: # only one distinct line, only one head
+            if len(heads) != 1:
+                print("Error: Something's wrong... arc {} had no joints but {} heads".format(arcNum, len(heads)))
+                return
+            head = heads[0]
+            line = [head]
+            currPixel = head
+            while True:
+                nextNeighbors = self._getSpineNeighbors(currPixel, 'next')
+                if len(nextNeighbors) == 0: # found endpoint of single line
+                    break
+                if len(nextNeighbors) > 1: # no joints implies only 1 neighbor
+                    print("Error: Something's wrong... arc {} had no joints but pixel {} had {} next neighbors".format(arcNum, currPixel, len(nextNeighbors)))
+                    return
+                line.append(nextNeighbors[0]) # add to line
+                currPixel = nextNeighbors[0]
+            
+            # line is now an array of pixels from head to tail
+            # now, get colors for each pixel accordingly
+            red = Color("red")
+            colors = list(red.range_to(Color("blue"), len(line)))
+            rgbs = [color.rgb for color in colors]
+            scaledRgbs = [(r*255, g*255, b*255) for (r, g, b) in rgbs]
+            return line, scaledRgbs
+
+        else: # multiple distinct lines joined at each joint
+            # for each joint, BFS out from it (all joints at the same time), keeping track of each pixel's distinct line
+            # when you reach an end, then you've completed a distinct line
+            # if you reach a pixel you've already visited, then combine that pixel's line with yours
+            # then you have all your distinct lines
+            # next, choose any joint to start at, assign it a color
+            # then, for each line that starts at that joint, assign the end of it a different color
+            # if that end is another joint, repeat the process. Otherwise done.
+            print("Error: This spine has multiple joints. You didn't code that possibilty in, time to do that!")
+            return
         
     # print spine tree
     def printSpineTree(self, arcNum):

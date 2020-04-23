@@ -9,6 +9,8 @@
  - For links, the knots might be different colors. Add component functionality
  - 3D seifert surfaces plots using matplotlib
  - http://hmeine.github.io/qimage2ndarray/ instead of files
+ - separating spheres
+ - generate a knot given crossing index
  
 
 ## To Connect Endpoints

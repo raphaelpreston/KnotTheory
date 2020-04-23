@@ -10,7 +10,8 @@ from colour import Color
 
 ARC_SEARCH_SHORTCUT = True
 ARC_EXPAND_SHORTCUT = True
-SPINE_SEARCH_SHORTCUT = False
+SPINE_SEARCH_SHORTCUT = True
+SPINE_MAP_SHORTCUT = True
 # todo: add spine-map shortcut
 
 class KnotHandler(): # TODO: delete self variables for certain steps once they're done
@@ -165,20 +166,7 @@ class KnotHandler(): # TODO: delete self variables for certain steps once they'r
         
         # take a step in BFS arc expansion
         elif self.status == "arc-expand":
-            if ARC_EXPAND_SHORTCUT: # cheat and fill out entire arc at once # TODO: make a function here so don't copy paste code
-                while(self.expansionQueue):
-                    nextPixel = self.expansionQueue.pop(0)
-                    for n in self.getNeighbors(nextPixel):
-                        if self.pixelIsArc(n) and n not in self.pixelsVisitedInExpansion:
-                            self.pixelsVisitedInExpansion.add(n) # visit it
-                            if self.isBoundaryPixel(n): # figure out what to color it
-                                self.boundaryPixelsToColorInExpansion.append(n)
-                                self.ah.addPixelToArc(n, self.currArcInExpansion, isBoundary=True)
-                            else:
-                                self.pixelsToColorInExpansion.append(n)
-                                self.ah.addPixelToArc(n, self.currArcInExpansion)
-                            self.expansionQueue.append(n) # add it to the queue
-            else:
+            def arcExpandStep():
                 nextPixel = self.expansionQueue.pop(0)
                 for n in self.getNeighbors(nextPixel):
                     if self.pixelIsArc(n) and n not in self.pixelsVisitedInExpansion:
@@ -186,67 +174,77 @@ class KnotHandler(): # TODO: delete self variables for certain steps once they'r
                         if self.isBoundaryPixel(n): # figure out what to color it
                             self.boundaryPixelsToColorInExpansion.append(n)
                             self.ah.addPixelToArc(n, self.currArcInExpansion, isBoundary=True)
-                            # self.arcBoundaryPixels[self.currArcInExpansion].append(n) # mark as boundary
                         else:
-                            self.pixelsToColorInExpansion.append(n)
+                            self.pixelsToColorInExpansion.append(n) # TODO: handle pixelstocolorinexpansion in AH
                             self.ah.addPixelToArc(n, self.currArcInExpansion)
                         self.expansionQueue.append(n) # add it to the queue
+            if ARC_EXPAND_SHORTCUT:
+                while(self.expansionQueue):
+                    arcExpandStep()
+            else:
+                arcExpandStep()
 
         # take a step in spine mapping
         elif self.status == 'spine-map': # TODO: change this expansion and arc expansion to be batch-by-batch, not one at a time (empty whole next ups at once)
-            currPixel = self.spineMapQueue.pop(0)
-            # begin by noting this newfound pixel
-            self.ah.setPixelAsSpine(currPixel) # assume already in arc
-            self.pixelsVisitedInSpineMapping.add(currPixel)
-            # get neighbors and error check
-            allNeighbors = self.getNeighbors(currPixel)
-            neighborsOnSpine = [n for n in allNeighbors if self.pixelIsSpine(n)]
-            if len(neighborsOnSpine) > 2 or len(neighborsOnSpine) < 1:
-                    print('Error: Pixel {} had more than two or less than one neighbor(s): {}'.format(currPixel, neighborsOnSpine))
-                    return
-            # initialize directions if necessary (implies no spine pixels are visited yet)
-            if len(self.spineMapPosDir) == 0 and len(self.spineMapNegDir) == 0:
-                if len(neighborsOnSpine) == 2:
-                    # choose one direction to be positive and one to be negative
-                    self.spineMapPosDir.add(neighborsOnSpine[0])
-                    self.spineMapNegDir.add(neighborsOnSpine[1])
-                elif len(neighborsOnSpine) == 1:
-                    # we must have hit an actual endpoint
-                    self.spineMapPosDir.add(neighborsOnSpine[0])
-                for p in neighborsOnSpine:
-                    self.spineMapQueue.append(p) # add to queue
-                    self.pixelsVisitedInSpineMapping.add(p) # mark as visited
-                    self.ah.setPixelAsSpine(p) # assume pixel already in arc
-                    # set their neighbors accordingly
-                    if p in self.spineMapPosDir:
-                        self.ah.setPositionInSpine(currPixel, nxt=p)
-                        self.ah.setPositionInSpine(p, prev=currPixel)
-                    elif p in self.spineMapNegDir:
-                        self.ah.setPositionInSpine(currPixel, prev=p)
-                        self.ah.setPositionInSpine(p, nxt=currPixel)
-                    else:
-                        print("Error: First pixel found on spine wasn't assigned position")
-            else: # directions already initialized
-                neighborsInMyDirection = [n for n in neighborsOnSpine
-                        if n not in self.pixelsVisitedInSpineMapping]
-                # there might be more than one neighbor (like at a fork)
-                for nextPixel in neighborsInMyDirection:
-                    if currPixel in self.spineMapPosDir:
-                        self.ah.setPositionInSpine(currPixel, nxt=nextPixel)
-                        self.ah.setPositionInSpine(nextPixel, prev=currPixel)
-                        # continue in same direction
-                        self.spineMapPosDir.add(nextPixel)
-                    elif currPixel in self.spineMapNegDir:
-                        self.ah.setPositionInSpine(currPixel, prev=nextPixel)
-                        self.ah.setPositionInSpine(nextPixel, nxt=currPixel)
-                        # continue in same direction
-                        self.spineMapNegDir.add(nextPixel)
-                    else:
-                        print("Error: Pixel {} wasn't assigned a direction in spine mapping".format(currPixel))
+            def spineMapStep():
+                currPixel = self.spineMapQueue.pop(0)
+                # begin by noting this newfound pixel
+                self.ah.setPixelAsSpine(currPixel) # assume already in arc
+                self.pixelsVisitedInSpineMapping.add(currPixel)
+                # get neighbors and error check
+                allNeighbors = self.getNeighbors(currPixel)
+                neighborsOnSpine = [n for n in allNeighbors if self.pixelIsSpine(n)]
+                if len(neighborsOnSpine) > 2 or len(neighborsOnSpine) < 1:
+                        print('Error: Pixel {} had more than two or less than one neighbor(s): {}'.format(currPixel, neighborsOnSpine))
                         return
-                    # add next pixel to the queue & visited
-                    self.spineMapQueue.append(nextPixel)
-                    self.pixelsVisitedInSpineMapping.add(nextPixel)
+                # initialize directions if necessary (implies no spine pixels are visited yet)
+                if len(self.spineMapPosDir) == 0 and len(self.spineMapNegDir) == 0:
+                    if len(neighborsOnSpine) == 2:
+                        # choose one direction to be positive and one to be negative
+                        self.spineMapPosDir.add(neighborsOnSpine[0])
+                        self.spineMapNegDir.add(neighborsOnSpine[1])
+                    elif len(neighborsOnSpine) == 1:
+                        # we must have hit an actual endpoint
+                        self.spineMapPosDir.add(neighborsOnSpine[0])
+                    for p in neighborsOnSpine:
+                        self.spineMapQueue.append(p) # add to queue
+                        self.pixelsVisitedInSpineMapping.add(p) # mark as visited
+                        self.ah.setPixelAsSpine(p) # assume pixel already in arc
+                        # set their neighbors accordingly
+                        if p in self.spineMapPosDir:
+                            self.ah.setPositionInSpine(currPixel, nxt=p)
+                            self.ah.setPositionInSpine(p, prev=currPixel)
+                        elif p in self.spineMapNegDir:
+                            self.ah.setPositionInSpine(currPixel, prev=p)
+                            self.ah.setPositionInSpine(p, nxt=currPixel)
+                        else:
+                            print("Error: First pixel found on spine wasn't assigned position")
+                else: # directions already initialized
+                    neighborsInMyDirection = [n for n in neighborsOnSpine
+                            if n not in self.pixelsVisitedInSpineMapping]
+                    # there might be more than one neighbor (like at a fork)
+                    for nextPixel in neighborsInMyDirection:
+                        if currPixel in self.spineMapPosDir:
+                            self.ah.setPositionInSpine(currPixel, nxt=nextPixel)
+                            self.ah.setPositionInSpine(nextPixel, prev=currPixel)
+                            # continue in same direction
+                            self.spineMapPosDir.add(nextPixel)
+                        elif currPixel in self.spineMapNegDir:
+                            self.ah.setPositionInSpine(currPixel, prev=nextPixel)
+                            self.ah.setPositionInSpine(nextPixel, nxt=currPixel)
+                            # continue in same direction
+                            self.spineMapNegDir.add(nextPixel)
+                        else:
+                            print("Error: Pixel {} wasn't assigned a direction in spine mapping".format(currPixel))
+                            return
+                        # add next pixel to the queue & visited
+                        self.spineMapQueue.append(nextPixel)
+                        self.pixelsVisitedInSpineMapping.add(nextPixel)
+            if SPINE_MAP_SHORTCUT:
+                while self.spineMapQueue:
+                    spineMapStep()
+            else:
+                spineMapStep()
 
     # draws whatever's necessary when it's time to draw
     def draw(self, qp):
@@ -296,21 +294,25 @@ class KnotHandler(): # TODO: delete self variables for certain steps once they'r
                 qp.setPen(pen)
                 qp.drawPoint(pixel[0], pixel[1])
         
-        # draw completed spines
+        # draw gradient between endpoints of completed spines
         if len(self.arcsCompletedInSpineMapping) > 0:
             for arcNum in self.arcsCompletedInSpineMapping:
-                for pixel in self.ah.getArcPixels(arcNum, spine=True):
-                    pen.setColor(Qt.green)
+                pixels, colors = self.ah.getSpinePaintMap(arcNum)
+                for i in range(len(pixels)):
+                    pixel = pixels[i]
+                    color = colors[i]
+                    pen.setColor(QColor(color[0], color[1], color[2]))
                     qp.setPen(pen)
                     qp.drawPoint(pixel[0], pixel[1])
         
-        # draw endpoints on top # todo: temporary, add gradient between endpoints
         if self.status == "done":
-            for arcNum in self.arcsCompletedInSpineMapping:
-                for pixel in self.ah.getSpineEndPoints(arcNum):
-                    pen.setColor(Qt.blue)
-                    qp.setPen(pen)
-                    qp.drawPoint(pixel[0], pixel[1])
+            pass
+            # for arcNum in self.arcsCompletedInSpineMapping:
+            #     print("Heads for arc {}: {}".format(arcNum, self.ah.getSpinePaintMap(arcNum)))
+            #     for pixel in self.ah.getSpineEndPoints(arcNum):
+            #         pen.setColor(Qt.blue)
+            #         qp.setPen(pen)
+            #         qp.drawPoint(pixel[0], pixel[1])
 
 
     def pixelIsArc(self, pixel):
