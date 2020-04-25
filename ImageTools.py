@@ -1,3 +1,6 @@
+# slope functions adapted from
+# https://pythonprogramming.net/how-to-program-best-fit-line-machine-learning-tutorial/
+
 from math import sin, cos, radians, sqrt
 from statistics import mean
 import numpy as np
@@ -6,7 +9,7 @@ import numpy as np
 # ordered array of integers from one point to another. Credit Wikipedia.
 def getPixelsBetween(x0, y0, x1, y1):
     # round origin and target to nearest pixel
-    x0, y0, x1, y1 = int(x0), int(y0), int(x1), int(y1)
+    x0, y0, x1, y1 = int(round(x0)), int(round(y0)), int(round(x1)), int(round(y1))
     pixels = []
     if abs(y1 - y0) < abs(x1 - x0):
         if x0 > x1:
@@ -66,24 +69,39 @@ def vectorToPoint(x0, y0, magnitude, degreeTheta):
     y1 = y0 + magnitude*sin(radians(degreeTheta))
     return (int(x1), int(y1))
 
-# slope for line of best fit from
-# https://pythonprogramming.net/how-to-program-best-fit-line-machine-learning-tutorial/
+def orderedRange(a, b):
+    if a <= b:
+        return range(a, b)
+    else:
+        return range(a, b, -1)
+
+# slope for line of best fit
 def slopeFromPoints(points):
     xs = np.array([p[0] for p in points], dtype=np.float64)
     ys = np.array([p[1] for p in points], dtype=np.float64)
     return (((mean(xs)*mean(ys)) - mean(xs*ys)) /
          ((mean(xs)*mean(xs)) - mean(xs*xs)))
 
+def squared_error(ys_orig, ys_line):
+    return sum((ys_line - ys_orig) * (ys_line - ys_orig))
+
+def coefficient_of_determination(ys_orig, ys_line):
+    y_mean_line = [mean(ys_orig) for y in ys_orig]
+    squared_error_regr = squared_error(ys_orig, ys_line)
+    squared_error_y_mean = squared_error(ys_orig, y_mean_line)
+    return 1 - (squared_error_regr/squared_error_y_mean)
+
 # get an n-length path of pixels out from fitToPoint such that the n-length path
 # follows the best line of fit through points.
 # Points must be ordered.
-def interpolateToPath(points, n, fitToPoint):
+def interpolateToPath(points, n, fitToPoint): # TODO: CHANGE SNAKE CASE TO CAMEL
     n = float(n)
+    xs = np.array([p[0] for p in points], dtype=np.float64)
+    ys = np.array([p[1] for p in points], dtype=np.float64)
     
     # get x0, y0
     x0 = float(fitToPoint[0])
     y0 = float(fitToPoint[1])
-
     
     # get the slope
     m = slopeFromPoints(points)
@@ -103,8 +121,27 @@ def interpolateToPath(points, n, fitToPoint):
     print("Change in x: {}".format(changeInX))
     print("Change in y: {}".format(changeInY))
 
-    # e destination pixel
-    destPixel = (x0 + changeInX, y0 + changeInY)
+    # compute how well the line fits the original points
+    computedYs = [m*x for x in xs]
+    r_squared = coefficient_of_determination(ys, computedYs)
+    print('Computed Ys: {}'.format(computedYs))
+    print('R squared of regression line: {}'.format(r_squared))
+
+    # compute destination pixel
+    x1 = x0 + changeInX
+    y1 = y0 + changeInY
+    destPixel = (x1, y1)
     print("Destination pixel: {}".format(destPixel))
 
     # get path of pixels to new pixel
+    path = getPixelsBetween(x0, y0, x1, y1)
+    print('Path: {}'.format(path))
+
+    # compute how well the path matches the regressed line
+    pixelXs = np.array([p[0] for p in path], dtype=np.float64)
+    pixelYs = np.array([p[1] for p in path], dtype=np.float64)
+    computedYs = [m*x for x in pixelXs]
+    r_squared = coefficient_of_determination(pixelYs, computedYs)
+    print('Ys for path: {}'.format(pixelYs))
+    print('Computed Ys for path: {}'.format(computedYs))
+    print('R squared of path vs computed path: {}'.format(r_squared))

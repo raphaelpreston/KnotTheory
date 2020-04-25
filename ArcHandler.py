@@ -221,7 +221,6 @@ class ArcHandler:
     def pixelHasSpine(self, pixel):
         return pixel in self.pixelSpines
 
-
 if __name__ == "__main__":
     from KnotCanvas import main
     main()
