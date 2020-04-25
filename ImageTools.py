@@ -1,4 +1,6 @@
-from math import sin, cos, radians
+from math import sin, cos, radians, sqrt
+from statistics import mean
+import numpy as np
 
 # implementation of Bresenham's line drawing algorithm to return an
 # ordered array of integers from one point to another. Credit Wikipedia.
@@ -63,3 +65,46 @@ def vectorToPoint(x0, y0, magnitude, degreeTheta):
     x1 = x0 + magnitude*cos(radians(degreeTheta))
     y1 = y0 + magnitude*sin(radians(degreeTheta))
     return (int(x1), int(y1))
+
+# slope for line of best fit from
+# https://pythonprogramming.net/how-to-program-best-fit-line-machine-learning-tutorial/
+def slopeFromPoints(points):
+    xs = np.array([p[0] for p in points], dtype=np.float64)
+    ys = np.array([p[1] for p in points], dtype=np.float64)
+    return (((mean(xs)*mean(ys)) - mean(xs*ys)) /
+         ((mean(xs)*mean(xs)) - mean(xs*xs)))
+
+# get an n-length path of pixels out from fitToPoint such that the n-length path
+# follows the best line of fit through points.
+# Points must be ordered.
+def interpolateToPath(points, n, fitToPoint):
+    n = float(n)
+    
+    # get x0, y0
+    x0 = float(fitToPoint[0])
+    y0 = float(fitToPoint[1])
+
+    
+    # get the slope
+    m = slopeFromPoints(points)
+    
+    # compute the change in x
+    changeInX = sqrt((n**2)/(m**2+1))
+    
+    # compute change in y
+    changeInY = m*changeInX
+    
+    # get slope of the best fit line through path
+    if points[-1][0] < points[0][0]: # ordered in reverse x direction
+        changeInX *= -1
+        changeInY *= -1
+
+    print("Slope: {}".format(m))
+    print("Change in x: {}".format(changeInX))
+    print("Change in y: {}".format(changeInY))
+
+    # e destination pixel
+    destPixel = (x0 + changeInX, y0 + changeInY)
+    print("Destination pixel: {}".format(destPixel))
+
+    # get path of pixels to new pixel

@@ -35,7 +35,6 @@ class KnotHandler(): # TODO: delete self variables for certain steps once they'r
         self.arcsCompletedInArcExpansion = []
         self.arcsCompletedInSpineMapping = []
         self.currArcInExpansion = 0
-        # self.currArcInSpineMap = 0
 
     # figure out what to do, status should ONLY be set in this function
     def computeTick(self):
