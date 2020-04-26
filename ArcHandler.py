@@ -1,4 +1,13 @@
 from colour import Color
+import ImageTools as itools
+
+
+# number of points to cut off from end of spine for the linear regression
+# to make the line that extends out from the tip of the arc
+POINTS_TO_CUT = 5
+
+# number of points towards the endpoint to be used for linear regression
+POINTS_FOR_LINREG = 10
 
 class ArcHandler:
     def __init__(self):
@@ -9,6 +18,15 @@ class ArcHandler:
         self.pixelSpines = dict() # pixel to spine
         self.spineTrees = [] # for each arc, dict maps pixel => {prev => [], next => []}
         self.spineEndPoints = [] # for each arc, list of endpoints
+        self.crossings = [] # arcNum => {endPoint => endPoint (of other arc)}
+
+
+    # call this to establish a connection between endpoints
+    def connectEndPointToEndPoint(self, ep1, ep2):
+        pass
+
+    def numArcsInitialized(self):
+        return len(self.arcPixels)
 
     # make sure we've allocated space for a new arc
     def forceArcInitialized(self, arcNum):
@@ -19,6 +37,7 @@ class ArcHandler:
             self.arcSpinePixels.append(set())
             self.spineTrees.append(dict())
             self.spineEndPoints.append(None)
+            self.crossings.append(dict())
 
     # use this to add a pixel to arc or set it as boundary or spine
     def addPixelToArc(self, pixel, arcNum, isBoundary=False, isSpine=False):
@@ -141,7 +160,7 @@ class ArcHandler:
         # save for later use
         self.spineEndPoints[arcNum] = list(ones)
         return ones
-        
+
     # return pixels, colors for a spine map in order to display a color
     # gradient in all distinct lines (to show endpoints)
     def getSpinePaintMap(self, arcNum):
@@ -220,6 +239,63 @@ class ArcHandler:
     # returns true if a pixel belongs to a spine
     def pixelHasSpine(self, pixel):
         return pixel in self.pixelSpines
+
+    # returns the paths of pixels to extend n length from an arc spine endpoint
+    # assumes two endpoints on either end of the arc
+    def getPathsForSpineExtension(self, arcNum, n):
+        if arcNum >= len(self.arcPixels): # not initalized with forceInitialized
+            print("Error: Arc {} hasn't been initialized yet")
+            return
+        
+        # get end points of the spine
+        spineEndPoints = self.getSpineEndPoints(arcNum)
+
+        # keep track of the points use for linear regression (for drawing)
+        allLinRegPoints = set()
+
+        # keep track of both paths to return
+        paths = []
+
+        for ep in spineEndPoints: # for each end point
+            # get which endpoint this is
+            forwardEnd = len(self.getNextSpinePixels(ep)) == 0
+            dirKey = "prev" if forwardEnd else "next"
+
+            # this endpoints points for linear regression
+            epLinRegPoints = []
+
+            # iterate into the arc and "chop off" the last couple points
+            currPoint = ep
+            for _ in range(0, POINTS_TO_CUT):
+                nextPoints = self._getSpineNeighbors(currPoint, dirKey)
+                if len(nextPoints) > 1:
+                    print("Erro: There was more than one neighbor.")
+                currPoint = nextPoints[0]
+            
+            # currPoint is the new endpoint to be used for linreg
+            for _ in range(0, POINTS_FOR_LINREG):
+                epLinRegPoints.append(currPoint)
+                allLinRegPoints.add(currPoint)
+                nextPoints = self._getSpineNeighbors(currPoint, dirKey)
+                if len(nextPoints) > 1:
+                    print("Erro: There was more than one neighbor.")
+                currPoint = nextPoints[0]
+            
+            # get n-length path from the endpoint using the linregpoints
+            epLinRegPoints.reverse() # points added in the wrong direction
+            path, r2 = itools.interpolateToPath(epLinRegPoints, n, ep)
+            print('R2 for path from endPoint {}: {}'.format(ep, r2))
+
+            paths.append(path)
+        # now we have two n-length paths extending out of both endpoints
+        return paths
+
+
+
+
+
+
+
 
 if __name__ == "__main__":
     from KnotCanvas import main

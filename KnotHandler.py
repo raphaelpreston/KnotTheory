@@ -1,12 +1,13 @@
 from LineFinder import *
 from random import randint, choice
-from math import sin, cos, radians
+from math import sin, cos, radians, sqrt
 import DrawTools as dtools
 import ImageTools as itools
 from ArcHandler import *
 from PyQt5.QtGui import QPainter, QColor, QPen
 from PyQt5.QtCore import Qt, QTimer
 from colour import Color
+import json
 
 ARC_SEARCH_SHORTCUT = True
 ARC_EXPAND_SHORTCUT = True
@@ -101,8 +102,41 @@ class KnotHandler(): # TODO: delete self variables for certain steps once they'r
             # check if we're at the last pixel
             if self.currPixelInSpineSearch[0] == self.imageWidth-1 and self.currPixelInSpineSearch[1] == self.imageHeight - 1:
                 print('Hit last pixel')
-                self.status = "done"
+                self.status = "spine-extension"
                 print(self.status)
+                # get paths for all endpoints (make path maximum possible diagonal)
+                paths = []
+                pathLength = sqrt(self.imageHeight**2 + self.imageWidth **2)
+                for arcNum in range(0, self.ah.numArcsInitialized()):
+                    paths.extend(self.ah.getPathsForSpineExtension(arcNum, pathLength))
+                self.spineExtensionPaths = dict() # endPoint => path excluding endpoint
+                self.spineExtensionStepped = dict() # endPoint => steps completed on path
+                for path in paths:
+                    endPoint = path[0]
+                    self.spineExtensionPaths[endPoint] = []
+                    self.spineExtensionStepped[endPoint] = []
+                    for pixel in path:
+                        # make sure pixel in bounds and exclude the endPoint
+                        if self.pixelInBounds(pixel) and pixel != endPoint:
+                            self.spineExtensionPaths[endPoint].append(pixel)
+                printTest = {str(k): v for k, v in self.spineExtensionPaths.items()}
+                print(json.dumps(printTest))
+
+            # map each path pixel to the endpoint and arc to which it belongs
+            self.spineExtensionPixelsToArc = dict() # extension pixel => [arcNum, arcNum]
+            # self.status = "done"
+        
+        elif self.status == "spine-extension":
+            # test if two extension lines have intersected
+            for pixel, endPoints in self.spineExtensionPixelsToArc.items():
+                if len(endPoints) > 1:
+                    print("Two lines collided at pixel {}. Endpoints: {}".format(
+                        pixel, endPoints
+                    ))
+                    self.status = "done"
+                    print(self.status)
+                    # TODO: what happens when if a path hits the wall (aka runs out of path)
+
         elif self.status == "spine-map":
             if not self.spineMapQueue: # we've run out of spine to map
                 # self.ah.setCompleted(self.currArcInExpansion)
@@ -162,6 +196,27 @@ class KnotHandler(): # TODO: delete self variables for certain steps once they'r
                     self.currPixelInSpineSearch = next(self.pixelIterSpineSearch)
                 except StopIteration:
                     print("Error: We finished iteration in performTick...")
+        
+        # take one step in all paths
+        elif self.status == "spine-extension":
+
+            # take the next step for each path
+            for endPoint, path in self.spineExtensionPaths.items():
+                # pop the step off
+                nextStep = path.pop(0)
+                print("Taking step {}".format(nextStep))
+
+                # take the step
+                self.spineExtensionStepped[endPoint].append(nextStep)
+
+                # mark it as an expansion from this arc; append it so
+                # computeTick can check to see if some extensions have collided
+                if nextStep in self.spineExtensionPixelsToArc:
+                    self.spineExtensionPixelsToArc[nextStep].append(endPoint)
+                else:
+                    self.spineExtensionPixelsToArc[nextStep] = [endPoint]
+
+            
         
         # take a step in BFS arc expansion
         elif self.status == "arc-expand":
@@ -262,7 +317,7 @@ class KnotHandler(): # TODO: delete self variables for certain steps once they'r
                 qp.drawPoint(pixel[0], pixel[1])
 
         # paint completed arcs
-        if self.status != 'spine-search' and self.status != 'spine-map' and self.status != 'done':
+        if self.status != 'spine-search' and self.status != 'spine-map' and self.status != 'spine-extension' and self.status != 'done':
             pen.setColor(Qt.green)
             qp.setPen(pen)
             for arcNum in self.arcsCompletedInArcExpansion: # all pixels
@@ -304,6 +359,14 @@ class KnotHandler(): # TODO: delete self variables for certain steps once they'r
                     qp.setPen(pen)
                     qp.drawPoint(pixel[0], pixel[1])
         
+        # draw paths extended from endpoints
+        if self.status == "spine-extension":
+            for _, stepped in self.spineExtensionStepped.items():
+                for pixel in stepped:
+                    pen.setColor(Qt.white)
+                    qp.setPen(pen)
+                    qp.drawPoint(pixel[0], pixel[1])
+        
         if self.status == "done":
             pass
             # for arcNum in self.arcsCompletedInSpineMapping:
@@ -335,12 +398,17 @@ class KnotHandler(): # TODO: delete self variables for certain steps once they'r
             for c in [-1, 0, 1]:
                 potentialRow = row+r
                 potentialCol = col+c
-                if 0 <= potentialRow < self.imageHeight:
-                    if 0 <= potentialCol < self.imageWidth:
-                        potentialPixel = (potentialCol, potentialRow) # swap back
-                        if potentialPixel != pixel:
-                            n.append(potentialPixel)
+                if self.pixelInBounds((potentialCol, potentialRow)):
+                    potentialPixel = (potentialCol, potentialRow) # swap back
+                    if potentialPixel != pixel:
+                        n.append(potentialPixel)
         return n
+    
+    # return true if pixel is in the height and width boundarys
+    def pixelInBounds(self, pixel):
+        row = pixel[1]
+        col = pixel[0]
+        return 0 <= row < self.imageHeight and 0 <= col < self.imageWidth
 
     # determine if a given arc pixel is a boundary of the arc
     def isBoundaryPixel(self, pixel):

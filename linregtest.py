@@ -12,5 +12,3 @@ interpolateToPath(pixels, 10, (0, 0))
 # pixels = [(1,3), (2,4), (4, 4)]
 # print(interpolateToPath(pixels, 5, (0,0)))
 
-# TODO: r^2 value is throwing negative values outside of 0 to 1
-

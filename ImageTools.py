@@ -94,7 +94,7 @@ def coefficient_of_determination(ys_orig, ys_line):
 # get an n-length path of pixels out from fitToPoint such that the n-length path
 # follows the best line of fit through points.
 # Points must be ordered.
-def interpolateToPath(points, n, fitToPoint): # TODO: CHANGE SNAKE CASE TO CAMEL
+def interpolateToPath(points, n, fitToPoint):
     n = float(n)
     xs = np.array([p[0] for p in points], dtype=np.float64)
     ys = np.array([p[1] for p in points], dtype=np.float64)
@@ -123,9 +123,8 @@ def interpolateToPath(points, n, fitToPoint): # TODO: CHANGE SNAKE CASE TO CAMEL
 
     # compute how well the line fits the original points
     computedYs = [m*x for x in xs]
-    r_squared = coefficient_of_determination(ys, computedYs)
-    print('Computed Ys: {}'.format(computedYs))
-    print('R squared of regression line: {}'.format(r_squared))
+    r2 = coefficient_of_determination(ys, computedYs)
+    print('R squared of regression line: {}'.format(r2))
 
     # compute destination pixel
     x1 = x0 + changeInX
@@ -137,11 +136,4 @@ def interpolateToPath(points, n, fitToPoint): # TODO: CHANGE SNAKE CASE TO CAMEL
     path = getPixelsBetween(x0, y0, x1, y1)
     print('Path: {}'.format(path))
 
-    # compute how well the path matches the regressed line
-    pixelXs = np.array([p[0] for p in path], dtype=np.float64)
-    pixelYs = np.array([p[1] for p in path], dtype=np.float64)
-    computedYs = [m*x for x in pixelXs]
-    r_squared = coefficient_of_determination(pixelYs, computedYs)
-    print('Ys for path: {}'.format(pixelYs))
-    print('Computed Ys for path: {}'.format(computedYs))
-    print('R squared of path vs computed path: {}'.format(r_squared))
+    return path, r2
