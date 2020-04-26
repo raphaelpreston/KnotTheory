@@ -90,7 +90,7 @@ class KnotCanvas(QWidget):
 
 def main(): # ignore already declared error
     app = QApplication(sys.argv)
-    ex = KnotCanvas('knot.png', 10)
+    ex = KnotCanvas('knot.png', 2)
     sys.exit(app.exec_())
 
 if __name__ == '__main__':

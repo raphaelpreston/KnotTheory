@@ -15,6 +15,8 @@ SPINE_SEARCH_SHORTCUT = True
 SPINE_MAP_SHORTCUT = True
 SPINE_EXTENSION_SHORTCUT = True
 
+EXTENSION_RADIUS = 4 # radius of rectangle that extends out of spine_end
+
 class KnotHandler(): # TODO: delete self variables for certain steps once they're done
     
     def __init__(self, imageData, skelImageData, swapImgFunc):
@@ -121,15 +123,20 @@ class KnotHandler(): # TODO: delete self variables for certain steps once they'r
                             self.spineExtensionPaths[endPoint].append(pixel)
 
             # map each path pixel to the endpoint and arc to which it belongs
-            self.spineExtensionPixelsToArc = dict() # extension pixel => [endPoint, endPoint, ...]
+            self.spineExtensionPixelsToArc = dict() # extension pixel => set(endPoint, endPoint, ...)
         
         elif self.status == "spine-extension":
             # test to see if all endPoints have intersected
             if self.ah.allEndpointsConnected():
                 self.status = "done"
                 print(self.status)
+                for arcNum, data in enumerate(self.ah.crossings):
+                    print("arc {} connections:".format(arcNum))
+                    for ep1, ep2 in data.items():
+                        print(" - {} ==> {}".format(ep1, ep2))
             else:
                 for pixel, endPoints in self.spineExtensionPixelsToArc.items():
+                    endPoints = list(endPoints)
                     if len(endPoints) > 1:
                         if len(endPoints) > 2:
                             print("Error: Multiple lines collided at the same time.")
@@ -210,14 +217,18 @@ class KnotHandler(): # TODO: delete self variables for certain steps once they'r
                     # pop the step off
                     nextStep = path.pop(0)
 
-                    # take the step
-                    self.spineExtensionStepped[endPoint].append(nextStep)
+                    # get the rectangle around the path
+                    rectPixels = itools.getRectangle(endPoint, nextStep, EXTENSION_RADIUS)
 
-                    # mark it as an expansion from this arc
-                    if nextStep in self.spineExtensionPixelsToArc:
-                        self.spineExtensionPixelsToArc[nextStep].append(endPoint)
-                    else:
-                        self.spineExtensionPixelsToArc[nextStep] = [endPoint]
+                    for pixel in rectPixels:
+                        # mark all pixels in search rectangle as stepped
+                        self.spineExtensionStepped[endPoint].append(pixel)
+
+                        # mark all pixels as an expansion from this arc
+                        if pixel in self.spineExtensionPixelsToArc:
+                            self.spineExtensionPixelsToArc[pixel].add(endPoint)
+                        else:
+                            self.spineExtensionPixelsToArc[pixel] = set([endPoint])
 
         
         # take a step in BFS arc expansion
