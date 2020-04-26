@@ -1,6 +1,7 @@
 from colour import Color
 import ImageTools as itools
 import json
+from random import sample
 
 
 # number of points to cut off from end of spine for the linear regression
@@ -21,6 +22,55 @@ class ArcHandler:
         self.spineEndPoints = [] # for each arc, list of endpoints
         self.crossings = [] # arcNum => {endPoint => endPoint (of other arc)}
 
+    # returns a linked list of the entire length of the knot
+    def enumerateKnotLength(self):
+        # helper function to return next pixel and new direction to travel in
+        def nextPixelAndDirKey(currPixel, currDirKey):
+            # if no direction, choose one
+            if currDirKey is None:
+                if self.getNextSpinePixels(currPixel):
+                    currDirKey = "next"
+                else:
+                    currDirKey = "prev"
+            # get the next pixels in line
+            nextPixels = self._getSpineNeighbors(currPixel, currDirKey)
+            # print("Got nextpixels from {}: {}".format(currPixel, nextPixels))
+            if len(nextPixels) > 1:
+                print("Error: can't have more than 1 neighbor in spine")
+                return
+            if not nextPixels: # we must be at an endpoint
+                epPair = self.getEndPointPair(currPixel)
+                # print(" - jumped to {}".format(epPair))
+                if epPair is None:
+                    print("Error: Pixel {} didn't have an endpoint partner".format(currPixel))
+                nextPixels = [epPair]
+                # change direction if necessary
+                if not self._getSpineNeighbors(epPair, currDirKey):
+                    currDirKey = "prev" if currDirKey == "next" else "next"
+            return nextPixels[0], currDirKey
+
+        # choose an random spine pixel
+        source = sample(self.pixelSpines.keys(), 1)[0]
+
+        # loop through until we hit source again
+        nextPixel, currDirKey = nextPixelAndDirKey(source, None)
+        enumeration = {source: {"next": nextPixel}}
+        currPixel = source
+        while nextPixel != source:
+            lastPixel = currPixel
+            currPixel = nextPixel
+            nextPixel, currDirKey = nextPixelAndDirKey(currPixel, currDirKey)
+            if currPixel in enumeration:
+                print("Error: Overriding pixel {} in enumeration".format(currPixel))
+                return
+            enumeration[currPixel] = {
+                "prev": lastPixel,
+                "next": nextPixel
+            }
+        # nextPixel is now source
+        enumeration[source]['prev'] = currPixel
+        return enumeration
+    
     # returns true if all spine endpoints have pairs
     def allEndpointsConnected(self):
         allEndPoints = []
@@ -59,7 +109,7 @@ class ArcHandler:
         self.crossings[arc2][ep2] = ep1 # connect arc2 to arc1
 
     def numArcsInitialized(self):
-        return len(self.arcPixels) # todo: use this function in places
+        return len(self.arcPixels) # todo: use this function in places change to arcIsInitialized
 
     # make sure we've allocated space for a new arc
     def forceArcInitialized(self, arcNum):

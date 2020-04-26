@@ -15,7 +15,7 @@ SPINE_SEARCH_SHORTCUT = True
 SPINE_MAP_SHORTCUT = True
 SPINE_EXTENSION_SHORTCUT = True
 
-EXTENSION_RADIUS = 4 # radius of rectangle that extends out of spine_end
+EXTENSION_RADIUS = 5 # radius of rectangle that extends out of spine_end
 
 class KnotHandler(): # TODO: delete self variables for certain steps once they're done
     
@@ -32,7 +32,7 @@ class KnotHandler(): # TODO: delete self variables for certain steps once they'r
 
         # instance variables
         self.status = None
-        self.ah = ArcHandler() # TODO: handle coloring too
+        self.ah = ArcHandler()
 
         # declare for persistence purposes
         self.arcsCompletedInArcExpansion = []
@@ -128,12 +128,23 @@ class KnotHandler(): # TODO: delete self variables for certain steps once they'r
         elif self.status == "spine-extension":
             # test to see if all endPoints have intersected
             if self.ah.allEndpointsConnected():
-                self.status = "done"
-                print(self.status)
                 for arcNum, data in enumerate(self.ah.crossings):
                     print("arc {} connections:".format(arcNum))
                     for ep1, ep2 in data.items():
                         print(" - {} ==> {}".format(ep1, ep2))
+                self.status = "done"
+                print(self.status)
+                # get crossings from Arc Handler
+                self.crossings = self.ah.crossings
+                # enumerate entire knot
+                self.knotEnumeration = self.ah.enumerateKnotLength()
+                if len(self.knotEnumeration) != len(self.ah.pixelSpines.keys()):
+                    print("Error: Enumeration ({}) and pixelSpines ({}) have different lengths".format(
+                        len(self.knotEnumeration), len(self.ah.pixelSpines.keys()
+                    )))
+                if any([len(ns) != 2 for pixel, ns in self.knotEnumeration.items()]):
+                    print("Error: A pixel doesn't have two neighbors.")
+                    return
             else:
                 for pixel, endPoints in self.spineExtensionPixelsToArc.items():
                     endPoints = list(endPoints)
