@@ -13,7 +13,7 @@ ARC_SEARCH_SHORTCUT = True
 ARC_EXPAND_SHORTCUT = True
 SPINE_SEARCH_SHORTCUT = True
 SPINE_MAP_SHORTCUT = True
-# todo: add spine-map shortcut
+SPINE_EXTENSION_SHORTCUT = True
 
 class KnotHandler(): # TODO: delete self variables for certain steps once they're done
     
@@ -116,26 +116,30 @@ class KnotHandler(): # TODO: delete self variables for certain steps once they'r
                     self.spineExtensionPaths[endPoint] = []
                     self.spineExtensionStepped[endPoint] = []
                     for pixel in path:
-                        # make sure pixel in bounds and exclude the endPoint
+                        # make sure pixel' in-bounds and exclude the endPoint
                         if self.pixelInBounds(pixel) and pixel != endPoint:
                             self.spineExtensionPaths[endPoint].append(pixel)
-                printTest = {str(k): v for k, v in self.spineExtensionPaths.items()}
-                print(json.dumps(printTest))
 
             # map each path pixel to the endpoint and arc to which it belongs
-            self.spineExtensionPixelsToArc = dict() # extension pixel => [arcNum, arcNum]
-            # self.status = "done"
+            self.spineExtensionPixelsToArc = dict() # extension pixel => [endPoint, endPoint, ...]
         
         elif self.status == "spine-extension":
-            # test if two extension lines have intersected
-            for pixel, endPoints in self.spineExtensionPixelsToArc.items():
-                if len(endPoints) > 1:
-                    print("Two lines collided at pixel {}. Endpoints: {}".format(
-                        pixel, endPoints
-                    ))
-                    self.status = "done"
-                    print(self.status)
-                    # TODO: what happens when if a path hits the wall (aka runs out of path)
+            # test to see if all endPoints have intersected
+            if self.ah.allEndpointsConnected():
+                self.status = "done"
+                print(self.status)
+            else:
+                for pixel, endPoints in self.spineExtensionPixelsToArc.items():
+                    if len(endPoints) > 1:
+                        if len(endPoints) > 2:
+                            print("Error: Multiple lines collided at the same time.")
+                            return
+                        # ensure we haven't already assigned a connection
+                        if (self.ah.getEndPointPair(endPoints[0]) is None
+                            and self.ah.getEndPointPair(endPoints[1]) is None):
+                            print("Extension lines collided at pixel {}. Endpoints: {}".format(pixel, endPoints))
+                            self.ah.connectEndPointToEndPoint(endPoints[0], endPoints[1])
+                        # TODO: what happens when if a path hits the wall (aka runs out of path)
 
         elif self.status == "spine-map":
             if not self.spineMapQueue: # we've run out of spine to map
@@ -200,23 +204,21 @@ class KnotHandler(): # TODO: delete self variables for certain steps once they'r
         # take one step in all paths
         elif self.status == "spine-extension":
 
-            # take the next step for each path
+            # take the next step for all paths that haven't intersected yet
             for endPoint, path in self.spineExtensionPaths.items():
-                # pop the step off
-                nextStep = path.pop(0)
-                print("Taking step {}".format(nextStep))
+                if self.ah.getEndPointPair(endPoint) is None: # not connected
+                    # pop the step off
+                    nextStep = path.pop(0)
 
-                # take the step
-                self.spineExtensionStepped[endPoint].append(nextStep)
+                    # take the step
+                    self.spineExtensionStepped[endPoint].append(nextStep)
 
-                # mark it as an expansion from this arc; append it so
-                # computeTick can check to see if some extensions have collided
-                if nextStep in self.spineExtensionPixelsToArc:
-                    self.spineExtensionPixelsToArc[nextStep].append(endPoint)
-                else:
-                    self.spineExtensionPixelsToArc[nextStep] = [endPoint]
+                    # mark it as an expansion from this arc
+                    if nextStep in self.spineExtensionPixelsToArc:
+                        self.spineExtensionPixelsToArc[nextStep].append(endPoint)
+                    else:
+                        self.spineExtensionPixelsToArc[nextStep] = [endPoint]
 
-            
         
         # take a step in BFS arc expansion
         elif self.status == "arc-expand":
@@ -360,10 +362,13 @@ class KnotHandler(): # TODO: delete self variables for certain steps once they'r
                     qp.drawPoint(pixel[0], pixel[1])
         
         # draw paths extended from endpoints
-        if self.status == "spine-extension":
-            for _, stepped in self.spineExtensionStepped.items():
+        if self.status == "spine-extension" or self.status == "done":
+            for endPoint, stepped in self.spineExtensionStepped.items():
                 for pixel in stepped:
-                    pen.setColor(Qt.white)
+                    if self.ah.getEndPointPair(endPoint) is None:
+                        pen.setColor(Qt.white)
+                    else:
+                        pen.setColor(QColor(50, 205, 50)) # is connected
                     qp.setPen(pen)
                     qp.drawPoint(pixel[0], pixel[1])
         

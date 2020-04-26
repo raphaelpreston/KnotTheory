@@ -1,5 +1,6 @@
 from colour import Color
 import ImageTools as itools
+import json
 
 
 # number of points to cut off from end of spine for the linear regression
@@ -20,13 +21,45 @@ class ArcHandler:
         self.spineEndPoints = [] # for each arc, list of endpoints
         self.crossings = [] # arcNum => {endPoint => endPoint (of other arc)}
 
+    # returns true if all spine endpoints have pairs
+    def allEndpointsConnected(self):
+        allEndPoints = []
+        for arcNum in range(0, self.numArcsInitialized()):
+            allEndPoints.extend(self.getSpineEndPoints(arcNum))
+        return not any([self.getEndPointPair(ep) is None for ep in allEndPoints])
+
+    # returns the endpoint that given endpoint is connected to
+    # returns None if not connected
+    def getEndPointPair(self, ep):
+        arcNum = self.getPixelArc(ep)
+        if arcNum is None:
+            print("Error: endpoint {} was not part of an arc".format(ep))
+            return
+        if arcNum >= len(self.arcPixels): # not initalized with forceInitialized
+            print("Error: Arc {} hasn't been initialized yet")
+            return None
+        return self.crossings[arcNum].get(ep, None)
 
     # call this to establish a connection between endpoints
     def connectEndPointToEndPoint(self, ep1, ep2):
-        pass
+        # get the necessary arcs
+        arc1 = self.getPixelArc(ep1)
+        arc2 = self.getPixelArc(ep2)
+        if arc1 is None:
+            print("Error: endpoint {} was not part of an arc".format(ep1))
+            return
+        if arc2 is None:
+            print("Error: endpoint {} was not part of an arc".format(ep2))
+            return
+        
+        # establish connection
+        if ep1 in self.crossings[arc1] or ep2 in self.crossings[arc2]:
+            print("Error: Can't override existing connection.")
+        self.crossings[arc1][ep1] = ep2 # connect arc1 to arc2
+        self.crossings[arc2][ep2] = ep1 # connect arc2 to arc1
 
     def numArcsInitialized(self):
-        return len(self.arcPixels)
+        return len(self.arcPixels) # todo: use this function in places
 
     # make sure we've allocated space for a new arc
     def forceArcInitialized(self, arcNum):

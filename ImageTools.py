@@ -117,23 +117,15 @@ def interpolateToPath(points, n, fitToPoint):
         changeInX *= -1
         changeInY *= -1
 
-    print("Slope: {}".format(m))
-    print("Change in x: {}".format(changeInX))
-    print("Change in y: {}".format(changeInY))
-
     # compute how well the line fits the original points
     computedYs = [m*x for x in xs]
     r2 = coefficient_of_determination(ys, computedYs)
-    print('R squared of regression line: {}'.format(r2))
 
     # compute destination pixel
     x1 = x0 + changeInX
     y1 = y0 + changeInY
-    destPixel = (x1, y1)
-    print("Destination pixel: {}".format(destPixel))
 
     # get path of pixels to new pixel
     path = getPixelsBetween(x0, y0, x1, y1)
-    print('Path: {}'.format(path))
 
     return path, r2
