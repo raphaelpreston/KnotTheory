@@ -158,7 +158,6 @@ class KnotHandler(): # TODO: delete self variables for certain steps once they'r
                             print("Extension lines collided at pixel {}. Endpoints: {}".format(pixel, endPoints))
                             self.ah.connectEndPointToEndPoint(endPoints[0], endPoints[1])
                         # TODO: what happens when if a path hits the wall (aka runs out of path)
-
         elif self.status == "spine-map":
             if not self.spineMapQueue: # we've run out of spine to map
                 # self.ah.setCompleted(self.currArcInExpansion)
@@ -373,7 +372,7 @@ class KnotHandler(): # TODO: delete self variables for certain steps once they'r
                 qp.drawPoint(pixel[0], pixel[1])
         
         # draw gradient between endpoints of completed spines
-        if len(self.arcsCompletedInSpineMapping) > 0:
+        if self.status != "done" and len(self.arcsCompletedInSpineMapping) > 0:
             for arcNum in self.arcsCompletedInSpineMapping:
                 pixels, colors = self.ah.getSpinePaintMap(arcNum)
                 for i in range(len(pixels)):
@@ -384,7 +383,7 @@ class KnotHandler(): # TODO: delete self variables for certain steps once they'r
                     qp.drawPoint(pixel[0], pixel[1])
         
         # draw paths extended from endpoints
-        if self.status == "spine-extension" or self.status == "done":
+        if self.status == "spine-extension":
             for endPoint, stepped in self.spineExtensionStepped.items():
                 for pixel in stepped:
                     if self.ah.getEndPointPair(endPoint) is None:
@@ -393,6 +392,30 @@ class KnotHandler(): # TODO: delete self variables for certain steps once they'r
                         pen.setColor(QColor(50, 205, 50)) # is connected
                     qp.setPen(pen)
                     qp.drawPoint(pixel[0], pixel[1])
+        
+        # draw color gradient over entire knot
+        if self.status == "done":
+            # get rgb values for as many pixels as we need
+            red = Color("red")
+            blue = Color("blue")
+            colors = list(red.range_to(blue, int(len(self.knotEnumeration)/2)))
+            colors.extend(list(blue.range_to(red, int(len(self.knotEnumeration)/2) + 1)))
+            rgbs = [color.rgb for color in colors]
+            scaledRgbs = [(r*255, g*255, b*255) for (r, g, b) in rgbs]
+            i = 0
+            source = list(self.knotEnumeration.keys())[0]
+            currPixel = source
+            while True:
+                color = scaledRgbs[i]
+                pen.setColor(QColor(color[0], color[1], color[2]))
+                qp.setPen(pen)
+                qp.drawPoint(currPixel[0], currPixel[1]) # ignore error
+                currPixel = self.knotEnumeration[currPixel]['next']
+                i += 1
+                if currPixel == source:
+                    break
+
+
         
         if self.status == "done":
             pass

@@ -15,23 +15,30 @@ QApplication.setAttribute(Qt.AA_EnableHighDpiScaling, True)
 
 class KnotCanvas(QWidget):
 
-    def __init__(self, fileName, tickFPS):
+    def __init__(self, givenFilePath, tickFPS):
         super().__init__()
 
+        # extract file directory and path
+        lastSlash = givenFilePath.rindex("/")
+        fileName = givenFilePath[lastSlash+1:]
+        knotsPath = givenFilePath[:lastSlash]
+        
+        self.skelFilePath = "{}/skeleton_{}.png".format(knotsPath, fileName)
+        self.filePath = "{}/{}".format(knotsPath, fileName)
+
         # skeletonize image
-        image = img_as_float(color.rgb2gray(io.imread('knot.png')))
+        image = img_as_float(color.rgb2gray(io.imread(self.filePath)))
         image_binary = image < 0.5
         self.skelImageData = morphology.skeletonize(image_binary)
-        io.imsave("skeleton.png", img_as_uint(self.skelImageData)) # TODO: delete when done
+        io.imsave(self.skelFilePath, img_as_uint(self.skelImageData)) # TODO: delete when done
 
         # declare class variables
-        self.fileName = fileName
-        self.imageData = io.imread(fileName) # get image data with sci-kit
+        self.imageData = io.imread(self.filePath) # get image data with sci-kit
         self.kh = KnotHandler(self.imageData, self.skelImageData, self.swapImage)
 
         # add image background
-        self.normalPixmap = QPixmap(fileName)
-        self.skelPixmap = QPixmap("skeleton.png")
+        self.normalPixmap = QPixmap(self.filePath)
+        self.skelPixmap = QPixmap(self.skelFilePath)
         self.activeImg = 'normal'
         self.label = QLabel()
         self.label.setPixmap(self.normalPixmap)
@@ -65,15 +72,8 @@ class KnotCanvas(QWidget):
 
     # boilerplate to handle frame-by-frame updates
     def paintEvent(self, event):
-        # reset background
-        # if self.activeImg == 'normal':
-        #     self.normalPixmap = QPixmap(self.fileName)
-        #     self.label.setPixmap(self.normalPixmap)
-        # else:
-        #     self.skelPixmap = QPixmap("skeleton.png")
-        #     self.label.setPixmap(self.skelPixmap)
-        self.normalPixmap = QPixmap(self.fileName)
-        self.skelPixmap = QPixmap("skeleton.png")
+        self.normalPixmap = QPixmap(self.filePath)
+        self.skelPixmap = QPixmap(self.skelFilePath)
         self.label.setPixmap(self.normalPixmap if self.activeImg == 'normal' else self.skelPixmap)
 
         qp = QPainter() # start painting
@@ -90,7 +90,7 @@ class KnotCanvas(QWidget):
 
 def main(): # ignore already declared error
     app = QApplication(sys.argv)
-    ex = KnotCanvas('knot.png', 10)
+    ex = KnotCanvas('knots/knot.png', 10)
     sys.exit(app.exec_())
 
 if __name__ == '__main__':
