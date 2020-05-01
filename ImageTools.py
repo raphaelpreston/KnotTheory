@@ -1,7 +1,7 @@
 # slope functions adapted from
 # https://pythonprogramming.net/how-to-program-best-fit-line-machine-learning-tutorial/
 
-from math import sin, cos, radians, degrees, sqrt, atan
+from math import sin, cos, radians, degrees, sqrt, atan, isnan, isinf
 from statistics import mean
 import numpy as np
 import json
@@ -115,8 +115,12 @@ def orderedRange(a, b):
 def slopeFromPoints(points):
     xs = np.array([p[0] for p in points], dtype=np.float64)
     ys = np.array([p[1] for p in points], dtype=np.float64)
-    return (((mean(xs)*mean(ys)) - mean(xs*ys)) /
-         ((mean(xs)*mean(xs)) - mean(xs*xs)))
+    # test to see if we have a vertical slope
+    if not any([x != xs[0] for x in xs]): # if all xs are the same
+        return float('inf')
+    else:
+        return (((mean(xs)*mean(ys)) - mean(xs*ys)) /
+            ((mean(xs)*mean(xs)) - mean(xs*xs)))
 
 def squared_error(ys_orig, ys_line):
     return sum((ys_line - ys_orig) * (ys_line - ys_orig))
@@ -146,12 +150,18 @@ def interpolateToPath(points, n, fitToPoint):
     changeInX = sqrt((n**2)/(m**2+1))
     
     # compute change in y
-    changeInY = m*changeInX
+    if isinf(m): # vertical slope
+        changeInY = n
+    else:
+        changeInY = m*changeInX
     
-    # get slope of the best fit line through path
-    if points[-1][0] < points[0][0]: # ordered in reverse x direction
-        changeInX *= -1
-        changeInY *= -1
+    # reverse direction if first point is "less than" the second point
+    if isinf(m) and points[-1][1] < points[0][1]:
+            changeInX *= -1
+            changeInY *= -1
+    elif points[-1][0] < points[0][0]:
+            changeInX *= -1
+            changeInY *= -1
 
     # compute how well the line fits the original points
     computedYs = [m*x for x in xs]
@@ -250,19 +260,5 @@ def getRectangle(p1, p2, radius):
     
     # print("Pixels in rectangle: {}".format(areaPixels))
     return areaPixels
-
-
-# print(pointsToVector(0,0,5,0)) # right
-# print(pointsToVector(0, 0, 5, 5)) # up right
-# print(pointsToVector(0,0,0,5)) # up
-# print(pointsToVector(5, 0, 0, 5)) # up left
-# print(pointsToVector(5,0,0,0)) # left
-# print(pointsToVector(5, 5, 0, 0)) # down left
-# print(pointsToVector(0,5,0,0)) # down
-# print(pointsToVector(0, 5, 5, 0)) # down right
-# getRectangle((0, 2), (5, 2), 2)
-# getRectangle((2, 2), (5, 5), 2)
-
-# getRectangle((428, 149),(428, 150), 4)
 
 

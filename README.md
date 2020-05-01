@@ -2,6 +2,9 @@
 
 # Restrictions of Image
  - Can't have different arcs touching eachother
+ - The space between crossings should be relatively equal
+   - assuming they are, this is a good way to detect if we passed the endpoint we were looking for
+   - maybe have it to do with the line thickness?
 
 # Ideas
  - Maybe not necessary to do BFS on all pixels of an arc? Just find the boundary?

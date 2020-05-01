@@ -6,7 +6,7 @@ from random import sample
 
 # number of points to cut off from end of spine for the linear regression
 # to make the line that extends out from the tip of the arc
-POINTS_TO_CUT = 5
+POINTS_TO_CUT = 0
 
 # number of points towards the endpoint to be used for linear regression
 POINTS_FOR_LINREG = 10
@@ -367,7 +367,6 @@ class ArcHandler:
             # get n-length path from the endpoint using the linregpoints
             epLinRegPoints.reverse() # points added in the wrong direction
             path, r2 = itools.interpolateToPath(epLinRegPoints, n, ep)
-            print('R2 for path from endPoint {}: {}'.format(ep, r2))
 
             paths.append(path)
         # now we have two n-length paths extending out of both endpoints
