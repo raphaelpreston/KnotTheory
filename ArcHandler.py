@@ -1,4 +1,15 @@
 from colour import Color
+import ImageTools as itools
+import json
+from random import sample
+
+
+# number of points to cut off from end of spine for the linear regression
+# to make the line that extends out from the tip of the arc
+POINTS_TO_CUT = 0
+
+# number of points towards the endpoint to be used for linear regression
+POINTS_FOR_LINREG = 10
 
 class ArcHandler:
     def __init__(self):
@@ -9,6 +20,96 @@ class ArcHandler:
         self.pixelSpines = dict() # pixel to spine
         self.spineTrees = [] # for each arc, dict maps pixel => {prev => [], next => []}
         self.spineEndPoints = [] # for each arc, list of endpoints
+        self.crossings = [] # arcNum => {endPoint => endPoint (of other arc)}
+
+    # returns a linked list of the entire length of the knot
+    def enumerateKnotLength(self):
+        # helper function to return next pixel and new direction to travel in
+        def nextPixelAndDirKey(currPixel, currDirKey):
+            # if no direction, choose one
+            if currDirKey is None:
+                if self.getNextSpinePixels(currPixel):
+                    currDirKey = "next"
+                else:
+                    currDirKey = "prev"
+            # get the next pixels in line
+            nextPixels = self._getSpineNeighbors(currPixel, currDirKey)
+            # print("Got nextpixels from {}: {}".format(currPixel, nextPixels))
+            if len(nextPixels) > 1:
+                print("Error: can't have more than 1 neighbor in spine")
+                return
+            if not nextPixels: # we must be at an endpoint
+                epPair = self.getEndPointPair(currPixel)
+                # print(" - jumped to {}".format(epPair))
+                if epPair is None:
+                    print("Error: Pixel {} didn't have an endpoint partner".format(currPixel))
+                nextPixels = [epPair]
+                # change direction if necessary
+                if not self._getSpineNeighbors(epPair, currDirKey):
+                    currDirKey = "prev" if currDirKey == "next" else "next"
+            return nextPixels[0], currDirKey
+
+        # choose an random spine pixel
+        source = sample(self.pixelSpines.keys(), 1)[0]
+
+        # loop through until we hit source again
+        nextPixel, currDirKey = nextPixelAndDirKey(source, None)
+        enumeration = {source: {"next": nextPixel}}
+        currPixel = source
+        while nextPixel != source:
+            lastPixel = currPixel
+            currPixel = nextPixel
+            nextPixel, currDirKey = nextPixelAndDirKey(currPixel, currDirKey)
+            if currPixel in enumeration:
+                print("Error: Overriding pixel {} in enumeration".format(currPixel))
+                return
+            enumeration[currPixel] = {
+                "prev": lastPixel,
+                "next": nextPixel
+            }
+        # nextPixel is now source
+        enumeration[source]['prev'] = currPixel
+        return enumeration
+    
+    # returns true if all spine endpoints have pairs
+    def allEndpointsConnected(self):
+        allEndPoints = []
+        for arcNum in range(0, self.numArcsInitialized()):
+            allEndPoints.extend(self.getSpineEndPoints(arcNum))
+        return not any([self.getEndPointPair(ep) is None for ep in allEndPoints])
+
+    # returns the endpoint that given endpoint is connected to
+    # returns None if not connected
+    def getEndPointPair(self, ep):
+        arcNum = self.getPixelArc(ep)
+        if arcNum is None:
+            print("Error: endpoint {} was not part of an arc".format(ep))
+            return
+        if arcNum >= len(self.arcPixels): # not initalized with forceInitialized
+            print("Error: Arc {} hasn't been initialized yet")
+            return None
+        return self.crossings[arcNum].get(ep, None)
+
+    # call this to establish a connection between endpoints
+    def connectEndPointToEndPoint(self, ep1, ep2):
+        # get the necessary arcs
+        arc1 = self.getPixelArc(ep1)
+        arc2 = self.getPixelArc(ep2)
+        if arc1 is None:
+            print("Error: endpoint {} was not part of an arc".format(ep1))
+            return
+        if arc2 is None:
+            print("Error: endpoint {} was not part of an arc".format(ep2))
+            return
+        
+        # establish connection
+        if ep1 in self.crossings[arc1] or ep2 in self.crossings[arc2]:
+            print("Error: Can't override existing connection.")
+        self.crossings[arc1][ep1] = ep2 # connect arc1 to arc2
+        self.crossings[arc2][ep2] = ep1 # connect arc2 to arc1
+
+    def numArcsInitialized(self):
+        return len(self.arcPixels) # todo: use this function in places change to arcIsInitialized
 
     # make sure we've allocated space for a new arc
     def forceArcInitialized(self, arcNum):
@@ -19,6 +120,7 @@ class ArcHandler:
             self.arcSpinePixels.append(set())
             self.spineTrees.append(dict())
             self.spineEndPoints.append(None)
+            self.crossings.append(dict())
 
     # use this to add a pixel to arc or set it as boundary or spine
     def addPixelToArc(self, pixel, arcNum, isBoundary=False, isSpine=False):
@@ -141,7 +243,7 @@ class ArcHandler:
         # save for later use
         self.spineEndPoints[arcNum] = list(ones)
         return ones
-        
+
     # return pixels, colors for a spine map in order to display a color
     # gradient in all distinct lines (to show endpoints)
     def getSpinePaintMap(self, arcNum):
@@ -220,6 +322,61 @@ class ArcHandler:
     # returns true if a pixel belongs to a spine
     def pixelHasSpine(self, pixel):
         return pixel in self.pixelSpines
+
+    # returns the paths of pixels to extend n length from an arc spine endpoint
+    # assumes two endpoints on either end of the arc
+    def getPathsForSpineExtension(self, arcNum, n):
+        if arcNum >= len(self.arcPixels): # not initalized with forceInitialized
+            print("Error: Arc {} hasn't been initialized yet")
+            return
+        
+        # get end points of the spine
+        spineEndPoints = self.getSpineEndPoints(arcNum)
+
+        # keep track of the points use for linear regression (for drawing)
+        allLinRegPoints = set()
+
+        # keep track of both paths to return
+        paths = []
+
+        for ep in spineEndPoints: # for each end point
+            # get which endpoint this is
+            forwardEnd = len(self.getNextSpinePixels(ep)) == 0
+            dirKey = "prev" if forwardEnd else "next"
+
+            # this endpoints points for linear regression
+            epLinRegPoints = []
+
+            # iterate into the arc and "chop off" the last couple points
+            currPoint = ep
+            for _ in range(0, POINTS_TO_CUT):
+                nextPoints = self._getSpineNeighbors(currPoint, dirKey)
+                if len(nextPoints) > 1:
+                    print("Erro: There was more than one neighbor.")
+                currPoint = nextPoints[0]
+            
+            # currPoint is the new endpoint to be used for linreg
+            for _ in range(0, POINTS_FOR_LINREG):
+                epLinRegPoints.append(currPoint)
+                allLinRegPoints.add(currPoint)
+                nextPoints = self._getSpineNeighbors(currPoint, dirKey)
+                if len(nextPoints) > 1:
+                    print("Erro: There was more than one neighbor.")
+                currPoint = nextPoints[0]
+            
+            # get n-length path from the endpoint using the linregpoints
+            epLinRegPoints.reverse() # points added in the wrong direction
+            path, r2 = itools.interpolateToPath(epLinRegPoints, n, ep)
+
+            paths.append(path)
+        # now we have two n-length paths extending out of both endpoints
+        return paths
+
+
+
+
+
+
 
 
 if __name__ == "__main__":
