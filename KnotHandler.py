@@ -12,7 +12,7 @@ import json
 ARC_SEARCH_SHORTCUT = True
 ARC_EXPAND_SHORTCUT = True
 SPINE_SEARCH_SHORTCUT = True
-SPINE_MAP_SHORTCUT = True
+SPINE_MAP_SHORTCUT = False
 SPINE_EXTENSION_SHORTCUT = True
 
 EXTENSION_RADIUS = 5 # radius of rectangle that extends out of spine_end
@@ -273,7 +273,6 @@ class KnotHandler(): # TODO: delete self variables for certain steps once they'r
                 neighborsOnSpine = [n for n in allNeighbors if self.pixelIsSpine(n)]
                 if len(neighborsOnSpine) > 2 or len(neighborsOnSpine) < 1:
                         print('Error: Pixel {} had more than two or less than one neighbor(s): {}'.format(currPixel, neighborsOnSpine))
-                        return
                 # initialize directions if necessary (implies no spine pixels are visited yet)
                 if len(self.spineMapPosDir) == 0 and len(self.spineMapNegDir) == 0:
                     if len(neighborsOnSpine) == 2:
