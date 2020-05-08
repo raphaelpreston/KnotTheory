@@ -6,10 +6,10 @@ from random import sample
 
 # number of points to cut off from end of spine for the linear regression
 # to make the line that extends out from the tip of the arc
-POINTS_TO_CUT = 0
+POINTS_TO_CUT = 5
 
 # number of points towards the endpoint to be used for linear regression
-POINTS_FOR_LINREG = 10
+POINTS_FOR_LINREG = 20
 
 class ArcHandler:
     def __init__(self):
@@ -244,14 +244,19 @@ class ArcHandler:
         self.spineEndPoints[arcNum] = list(ones)
         return ones
 
+    # retusns the spine joints of a given arcNum
+    def getSpineJoints(self, arcNum):
+        spinePixels = self.getArcPixels(arcNum, spine=True)
+        return [p for p in spinePixels
+            if len(self._getSpineNeighbors(p, 'prev') + self._getSpineNeighbors(p, 'next')) > 2]
+
     # return pixels, colors for a spine map in order to display a color
     # gradient in all distinct lines (to show endpoints)
     def getSpinePaintMap(self, arcNum):
         spinePixels = self.getArcPixels(arcNum, spine=True)
         endPoints = self.getSpineEndPoints(arcNum)
         heads = [p for p in endPoints if self._getSpineNeighbors(p, 'next')]
-        joints = [p for p in spinePixels
-            if len(self._getSpineNeighbors(p, 'prev') + self._getSpineNeighbors(p, 'next')) > 2]
+        joints = self.getSpineJoints(arcNum)
 
         # for a bunch of distinct lines
         if len(joints) == 0: # only one distinct line, only one head
@@ -289,7 +294,129 @@ class ArcHandler:
             # if that end is another joint, repeat the process. Otherwise done.
             print("Error: This spine has multiple joints. You didn't code that possibilty in, time to do that!")
             return
+
+    # rid spine of joints so it's only one continuous line
+    def cleanSpine(self, arcNum):
+        joints = self.getSpineJoints(arcNum)
+
+        print("Spine {} has {} joints".format(arcNum, len(joints)))
+
+        # convert spinepixels into a undirected, weighted graph:
+        #  - edges store direction and distance
+        #  - vertices represent joints
+        n = len(joints)
+        vs = set()
+        edges = dict()
+
+        def setVertexOrEdge(v1, v2=None, dir=None, weight=None):
+            if dir != "next" and dir != "prev":
+                print('Wrong direction value.')
+                return
+            def initializeEdges(v):
+                if v not in edges: # careful not to override
+                    # allocate dict to point to all other vertices
+                    edges[v] = dict()
+            # only one vertex given
+            if v1 is not None and v2 is None and weight is None and dir is None:
+                v = v1
+                vs.add(v) # add the vertex
+                initializeEdges(v)
+            # two vertices given
+            elif not(any([v is None for v in [v1, v2, dir, weight]])):
+                # ensure both vertices are added
+                vs.update([v1,v2])
+                for v in [v1, v2]: # guarantee initialization of edges
+                    initializeEdges(v)
+                # set each edge's weight
+                oppositeDir = "next" if dir == "prev" else "prev"
+                edges[v1][(v2, dir)] = weight
+                edges[v1][(v2, oppositeDir)] = None
+                edges[v2][(v1, oppositeDir)] = weight
+                edges[v2][(v1, dir)] = None
+            else:
+                print("Error: Unexpected combination of params.")
+                return
+
+        # for each joint, compute the distance to all other joints
+        for sourceJoint in joints:
+            nextDir = set()
+            prevDir = set() # keep track of directions of pixels
+            dist = 0
+            q = [sourceJoint]
+            visited = set([sourceJoint])
+            while q: # BFS out in batches at a time
+                # empty out a batch
+                currPixs = [pix for pix in q]
+                q = []
+                neighbors = []
+                for pix in currPixs:
+                    # get neighbors of all pixels in the q
+                    nextPixels = self.getNextSpinePixels(pix)
+                    prevPixels = self.getPrevSpinePixels(pix)
+                    # keep track of directionality
+                    nextDir.update(nextPixels)
+                    prevDir.update(prevPixels)
+                    # add all neighbors to be explored
+                    neighbors.extend(nextPixels + prevPixels)
+                    # see if we've hit any joints
+                    if pix in joints and pix != sourceJoint:
+                        if pix in nextDir:
+                            dirFromSource = "next"
+                        elif pix in prevDir:
+                            dirFromSource = "prev"
+                        else:
+                            print("Error: No direction found for joint {}".format(pix))
+                            print("nexts: {}".format(nextPixels))
+                            print("prevs: {}".format(prevPixels))
+                            return
+                        setVertexOrEdge(sourceJoint, pix, dirFromSource, dist)
+                # explore each neighbor
+                for n in neighbors:
+                    if n not in visited:
+                        visited.add(n)
+                        q.append(n)
+                dist += 1
         
+        print(" --------- Distance to Joints Computed ----------")
+        print("VERTICES: {}".format(vs))
+        print('EDGES:')
+        for v1 in edges:
+            print("{}:".format(v1))
+            for dir in ["prev", "next"]:
+                print('  towards {}:'.format(dir))
+                for v2Comp in edges[v1]:
+                    v2 = v2Comp[0]
+                    myDir = v2Comp[1]
+                    if myDir == dir:
+                        print("  -->{}: {}".format(v2, edges[v1][v2Comp]))
+        
+        # find two joints that are the furthest apart
+        maxDist = 0
+        jointPair = []
+        for j1 in edges:
+            for j2Comp in edges[j1]: # (point, direction)
+                j2 = j2Comp[0]
+                # dir = j2Comp[1]
+                dist = edges[j1][j2Comp]
+                if dist is not None and dist > maxDist:
+                    jointPair = [j1, j2]
+                    maxDist = dist
+        print('Maximum distance: {}'.format(maxDist))
+        print('Joint pair: {}'.format(jointPair))
+
+        # cut off extra spine from all other joints
+        # for each non-jointpair joint
+        # cut off everything in the direction in which you can't reach both jointpair joints
+
+
+
+
+
+
+
+
+
+
     # print spine tree
     def printSpineTree(self, arcNum):
         print(self.spineTrees[arcNum]) # todo, print ordered tree from an endpoint

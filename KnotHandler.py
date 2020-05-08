@@ -160,7 +160,10 @@ class KnotHandler(): # TODO: delete self variables for certain steps once they'r
                         # TODO: what happens when if a path hits the wall (aka runs out of path)
         elif self.status == "spine-map":
             if not self.spineMapQueue: # we've run out of spine to map
-                # self.ah.setCompleted(self.currArcInExpansion)
+                # clean the spine
+                print("Cleaning spine {}...".format(self.currArcInSpineMap))
+                self.ah.cleanSpine(self.currArcInSpineMap)
+                self.a
                 self.arcsCompletedInSpineMapping.append(self.currArcInSpineMap)
                 self.status = "spine-search"
                 print(self.status)
