@@ -163,7 +163,7 @@ class KnotHandler(): # TODO: delete self variables for certain steps once they'r
                 # clean the spine
                 print("Cleaning spine {}...".format(self.currArcInSpineMap))
                 self.ah.cleanSpine(self.currArcInSpineMap)
-                self.a
+                # self.a
                 self.arcsCompletedInSpineMapping.append(self.currArcInSpineMap)
                 self.status = "spine-search"
                 print(self.status)

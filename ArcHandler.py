@@ -212,6 +212,89 @@ class ArcHandler:
     def getPrevSpinePixels(self, pixel):
         return self._getSpineNeighbors(pixel, "prev")
 
+    # returns (dir, dist) pair
+    def _distToSpinePixel(self, source, target):
+        arcNumSource = self.getPixelArc(source)
+        arcNumTarget = self.getPixelArc(target)
+        if arcNumSource is None or arcNumTarget: # not assigned to an arc
+            print("Error: Pixel {} or {} doesn't have an arc".format(source, target))
+            return
+        if arcNumSource != arcNumTarget:
+            print("Error: Pixels {} and {} are in different arcs".format(source, target))
+            return
+        arcNum = arcNumSource
+        if source not in self.pixelSpines: # not assigned to a spine
+            print("Warning: Source {} is not a spine pixel".format(source))
+            return
+        if target not in self.pixelSpines: # not assigned to a spine
+            print("Warning: Target {} is not a spine pixel".format(source))
+            return
+        if self.pixelSpines[source] != arcNum: # assigned to another spine
+            print("Error: Source {} is not a spine pixel for arc {}, rather for {}".format(source, arcNum, self.pixelSpines[source]))
+            return
+        if self.pixelSpines[target] != arcNum: # assigned to another spine
+            print("Error: Target {} is not a spine pixel for arc {}, rather for {}".format(target, arcNum, self.pixelSpines[target]))
+            return
+        if arcNum >= len(self.arcPixels): # not initalized with forceInitialized yet
+            print("Error: Arc {} hasn't been initialized yet")
+            return None
+
+        print("Computing distance from {} to {}".format(source, target))
+        if source == target:
+            return None, 0
+
+        # essentially BFS out in both directions until we explored everywhere
+        dirFromSource = None
+        nextDir = set()
+        prevDir = set() # keep track of directions of pixels
+        dist = 0
+        q = [source]
+        visited = set([source])
+        while q: # BFS out in batches at a time
+            # empty out a batch
+            currPixs = [pix for pix in q]
+            q = []
+            neighbors = []
+            for pix in currPixs:
+                # get neighbors of all pixels in the q
+                nextPixels = self.getNextSpinePixels(pix)
+                prevPixels = self.getPrevSpinePixels(pix)
+                # keep track of directionality
+                nextDir.update(nextPixels)
+                prevDir.update(prevPixels)
+                # add all neighbors to be explored
+                neighbors.extend(nextPixels + prevPixels)
+                # see if we've hit our target
+                if pix == target:
+                    if dirFromSource is not None:
+                        print("Error, found multiple ways to get from {} to {}".format(source, target))
+                        return
+                    if pix in nextDir:
+                        dirFromSource = "next"
+                    elif pix in prevDir:
+                        dirFromSource = "prev"
+                    else:
+                        print("Error: No direction found for {}".format(pix))
+                        print("nexts: {}".format(nextPixels))
+                        print("prevs: {}".format(prevPixels))
+                        return
+            # explore each neighbor
+            for n in neighbors:
+                if n not in visited:
+                    visited.add(n)
+                    q.append(n)
+            dist += 1
+        
+        if dirFromSource is None:
+            print("Error: Source {} couldn't reach pixel {}".format(source, target))
+            return
+        return dirFromSource, dist
+
+    # returns true if spine pixel p1 can reach p2 in given direction
+    def _spinePixReachable(self, p1, p2, desiredDir):
+        actualDir, dist = self._distToSpinePixel(p1, p2)
+        return actualDir == desiredDir
+
     def getSpineEndPoints(self, arcNum):
         if arcNum is None:
             print("Error: Arcnum is None")
@@ -253,7 +336,6 @@ class ArcHandler:
     # return pixels, colors for a spine map in order to display a color
     # gradient in all distinct lines (to show endpoints)
     def getSpinePaintMap(self, arcNum):
-        spinePixels = self.getArcPixels(arcNum, spine=True)
         endPoints = self.getSpineEndPoints(arcNum)
         heads = [p for p in endPoints if self._getSpineNeighbors(p, 'next')]
         joints = self.getSpineJoints(arcNum)
@@ -285,13 +367,6 @@ class ArcHandler:
             return line, scaledRgbs
 
         else: # multiple distinct lines joined at each joint
-            # for each joint, BFS out from it (all joints at the same time), keeping track of each pixel's distinct line
-            # when you reach an end, then you've completed a distinct line
-            # if you reach a pixel you've already visited, then combine that pixel's line with yours
-            # then you have all your distinct lines
-            # next, choose any joint to start at, assign it a color
-            # then, for each line that starts at that joint, assign the end of it a different color
-            # if that end is another joint, repeat the process. Otherwise done.
             print("Error: This spine has multiple joints. You didn't code that possibilty in, time to do that!")
             return
 
@@ -301,158 +376,70 @@ class ArcHandler:
 
         print("Spine {} has {} joints".format(arcNum, len(joints)))
 
-        # convert spinepixels into a undirected, weighted graph:
-        #  - edges store direction and distance
-        #  - vertices represent joints
-        n = len(joints)
-        vs = set()
-        edges = dict()
-
-        def setVertexOrEdge(v1, v2=None, dir=None, weight=None):
-            if dir != "next" and dir != "prev":
-                print('Wrong direction value.')
-                return
-            def initializeEdges(v):
-                if v not in edges: # careful not to override
-                    # allocate dict to point to all other vertices
-                    edges[v] = dict()
-            # only one vertex given
-            if v1 is not None and v2 is None and weight is None and dir is None:
-                v = v1
-                vs.add(v) # add the vertex
-                initializeEdges(v)
-            # two vertices given
-            elif not(any([v is None for v in [v1, v2, dir, weight]])):
-                # ensure both vertices are added
-                vs.update([v1,v2])
-                for v in [v1, v2]: # guarantee initialization of edges
-                    initializeEdges(v)
-                # set each edge's weight
-                oppositeDir = "next" if dir == "prev" else "prev"
-                edges[v1][(v2, dir)] = weight
-                edges[v1][(v2, oppositeDir)] = None
-                edges[v2][(v1, oppositeDir)] = weight
-                edges[v2][(v1, dir)] = None
-            else:
-                print("Error: Unexpected combination of params.")
-                return
-
-        # returns the direction if reachable, False otherwise
-        # also checks that our graph is formed correctly 
-        def dirJointToJoint(v1, v2):
-            myEdges = edges[v1]
-            hisEdges = edges[v2]
-
-            if (v2, "prev") in myEdges and (v2, "next") in myEdges:
-                print('Error, {} can go both ways to get to {}'.format(v1, v2))
-                return
-            elif (v2, "prev") in myEdges:
-                if (v1, "next") not in hisEdges:
-                    print("Error, {} goes 'prev' to get to {}, but he doesn't go 'next'".format(v1, v2))
-                    return
-                else:
-                    return "prev"
-            elif (v2, "next") in myEdges:
-                if (v1, "prev") not in hisEdges:
-                    print("Error, {} goes 'next' to get to {}, but he doesn't go 'prev'".format(v1, v2))
-                    return
-                else:
-                    return "next"
-
-        
-        # for each joint, compute the distance to all other joints
-        for sourceJoint in joints:
-            nextDir = set()
-            prevDir = set() # keep track of directions of pixels
-            dist = 0
-            q = [sourceJoint]
-            visited = set([sourceJoint])
-            while q: # BFS out in batches at a time
-                # empty out a batch
-                currPixs = [pix for pix in q]
-                q = []
-                neighbors = []
-                for pix in currPixs:
-                    # get neighbors of all pixels in the q
-                    nextPixels = self.getNextSpinePixels(pix)
-                    prevPixels = self.getPrevSpinePixels(pix)
-                    # keep track of directionality
-                    nextDir.update(nextPixels)
-                    prevDir.update(prevPixels)
-                    # add all neighbors to be explored
-                    neighbors.extend(nextPixels + prevPixels)
-                    # see if we've hit any joints
-                    if pix in joints and pix != sourceJoint:
-                        if pix in nextDir:
-                            dirFromSource = "next"
-                        elif pix in prevDir:
-                            dirFromSource = "prev"
-                        else:
-                            print("Error: No direction found for joint {}".format(pix))
-                            print("nexts: {}".format(nextPixels))
-                            print("prevs: {}".format(prevPixels))
-                            return
-                        setVertexOrEdge(sourceJoint, pix, dirFromSource, dist)
-                # explore each neighbor
-                for n in neighbors:
-                    if n not in visited:
-                        visited.add(n)
-                        q.append(n)
-                dist += 1
-        
-        print(" --------- Distance to Joints Computed ----------")
-        print("VERTICES: {}".format(vs))
-        print('EDGES:')
-        for v1 in edges:
-            print("{}:".format(v1))
-            for dir in ["prev", "next"]:
-                print('  towards {}:'.format(dir))
-                for v2Comp in edges[v1]:
-                    v2 = v2Comp[0]
-                    myDir = v2Comp[1]
-                    if myDir == dir:
-                        print("  -->{}: {}".format(v2, edges[v1][v2Comp]))
-        
         # find two joints that are the furthest apart
         maxDist = 0
         jointPair = []
-        for j1 in edges:
-            for j2Comp in edges[j1]: # (point, direction)
-                j2 = j2Comp[0]
-                # dir = j2Comp[1]
-                dist = edges[j1][j2Comp]
-                if dist is not None and dist > maxDist:
+        for j1 in joints:
+            for j2 in joints:
+                _, dist = self._distToSpinePixel(j1, j2)
+                if dist > maxDist:
                     jointPair = [j1, j2]
                     maxDist = dist
         print('Maximum distance: {}'.format(maxDist))
         print('Joint pair: {}'.format(jointPair))
 
-        # cut off extra spine from all other joints
-        # for each non-jointpair joint
-        for badJoint in [joint for joint in joints if joint not in jointPair]:
-            print("Analyzing bad joint {}".format(badJoint))
+        # cut off extra spines from all joints
+        for joint in joints:
+            print("Analyzing joint {}".format(joint))
+            mainJ1 = jointPair[0]
+            mainJ2 = jointPair[1]
 
-            # determine which neighbor should be sliced off
-            j1 = jointPair[0]
-            j2 = jointPair[1]
-            dirToJ1 = dirJointToJoint(badJoint, j1)
-            dirToJ2 = dirJointToJoint(badJoint, j2)
+            # by definition, a joint has >1 neighbor in only a single direction
+            # because the joint was initially discovered from one direction.
+            # only one of these neighbor "paths" should lead to a j1 or j2
 
-            if not dirToJ1 and not dirToJ2:
-                print("Couldn't reach both {} and {} from {}".format(j1, j2, badJoint))
+            # get the neighbors in the split direction of the joint
+            prevNs = self.getPrevSpinePixels(joint)
+            nextNs = self.getNextSpinePixels(joint)
+            if len(prevNs) > 1 and len(nextNs) > 1:
+                print("Something went wrong; {} had multiple neighbors in both directions".format(joint))
+                print("Next: {}".format(nextNs))
+                print("Prev: {}".format(prevNs))
+            elif len(prevNs) > 1:
+                multNs = prevNs
+                splitDir = "prev"
+            elif len(nextNs) > 1:
+                multNs = nextNs
+                splitDir = "next"
+            else:
+                print("Error: We called {} a joint but it doesn't have multiple neighbors in a direction".format(joint))
+            
+            # snip the connection to each neighbor that doesn't lead to a main joint
+            # via the correct direction
+            toSnip = []
+            spineTree = self.spineTrees[arcNum]
+            for neighbor in multNs:
+                canReachJ1 = self._spinePixReachable(neighbor, mainJ1, splitDir)
+                canReachJ2 = self._spinePixReachable(neighbor, mainJ2, splitDir)
+                if not (canReachJ1 or canReachJ2): # can't reach either
+                    toSnip.append(neighbor)
+
+            print('About to snip {}'.format(toSnip))
+
+            # set correct single neighbor manually
+            newNeighbors = [n for n in multNs if n not in toSnip]
+            if len(newNeighbors) > 1:
+                print("Error. New neighbors is {}, but it should be no more than 1 value".format(newNeighbors))
                 return
-            elif dirToJ1 and dirToJ2:
+            spineTree[joint][splitDir] = newNeighbors
+            print("Set spinetree[{}][{}] to {}".format(joint, splitDir, newNeighbors))
 
+            # remove all pixels in that direction from pixelSpines and arcSpinePixels
+            # TODO: WORKING HERE
+            
         
-
-        # cut off everything in the direction in which you can't reach both jointpair joints
-
-
-
-
-
-
-
+        # reset spine endpoints
+        self.spineEndPoints[arcNum] = None
 
 
 
