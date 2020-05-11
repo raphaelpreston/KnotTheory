@@ -90,13 +90,13 @@ class KnotHandler(): # TODO: delete self variables for certain steps once they'r
         # see if we hit a spine or done searching
         elif self.status == "spine-search":
             # TODO currPix = self.currPixelInArcSearch
-            if self.pixelIsSpine(self.currPixelInSpineSearch): 
-                if not self.ah.pixelHasSpine(self.currPixelInArcSearch): # doesn't belong to a spine yet
+            if self.pixelIsSpine(self.currPixelInSpineSearch):
+                # doesn't belong to a spine yet and hasn't been snipped from one 
+                if not self.ah.pixelHasSpine(self.currPixelInArcSearch) \
+                        and self.currPixelInSpineSearch not in self.ah.snippedSpinePixs:
                     self.status = "spine-map"
                     self.currArcInSpineMap = self.ah.getPixelArc(self.currPixelInSpineSearch)
                     print("{} at {}, belongs to arc {}".format(self.status, self.currPixelInSpineSearch, self.currArcInSpineMap))
-                    self.status = "spine-map" # initialize spine mapping
-                    print(self.status)
                     self.spineMapQueue = [self.currPixelInSpineSearch]
                     self.pixelsVisitedInSpineMapping = set([self.currPixelInSpineSearch]) # make sure we go away from where we started
                     self.spineMapPosDir = set() # spine pixels that go in the positive direction
@@ -209,8 +209,10 @@ class KnotHandler(): # TODO: delete self variables for certain steps once they'r
                     try:
                         self.currPixelInSpineSearch = next(self.pixelIterSpineSearch)
                         if self.pixelIsSpine(self.currPixelInSpineSearch):
-                            if not self.ah.pixelHasSpine(self.currPixelInSpineSearch):
-                                break # we hit a spine pixel that doesn't belong to a spine yet
+                            # if we hit a spine pixel that hasn't been snipped from a spine
+                            if not self.ah.pixelHasSpine(self.currPixelInSpineSearch) \
+                                    and self.currPixelInSpineSearch not in self.ah.snippedSpinePixs:
+                                break
                     except StopIteration:
                         # stay at the last pixel so computeTick knows we're done
                         self.currPixelInSpineSearch = thisPixelInSearch
@@ -274,17 +276,21 @@ class KnotHandler(): # TODO: delete self variables for certain steps once they'r
                 # get neighbors and error check
                 allNeighbors = self.getNeighbors(currPixel)
                 neighborsOnSpine = [n for n in allNeighbors if self.pixelIsSpine(n)]
+                if currPixel == (22,112):
+                    print('Neighbors on spine of (22,112): {}'.format(neighborsOnSpine))
                 if len(neighborsOnSpine) > 2 or len(neighborsOnSpine) < 1:
-                        print('Error: Pixel {} had more than two or less than one neighbor(s): {}'.format(currPixel, neighborsOnSpine))
+                        print('Warning: Pixel {} had more than two or less than one neighbor(s): {}'.format(currPixel, neighborsOnSpine))
                 # initialize directions if necessary (implies no spine pixels are visited yet)
                 if len(self.spineMapPosDir) == 0 and len(self.spineMapNegDir) == 0:
-                    if len(neighborsOnSpine) == 2:
+                    if len(neighborsOnSpine) == 2: # TODO: THIS COULD BE THREE, test this
                         # choose one direction to be positive and one to be negative
                         self.spineMapPosDir.add(neighborsOnSpine[0])
                         self.spineMapNegDir.add(neighborsOnSpine[1])
                     elif len(neighborsOnSpine) == 1:
                         # we must have hit an actual endpoint
                         self.spineMapPosDir.add(neighborsOnSpine[0])
+                    elif len(neighborsOnSpine > 3):
+                        print("You didn't code this possibility in !!!!")
                     for p in neighborsOnSpine:
                         self.spineMapQueue.append(p) # add to queue
                         self.pixelsVisitedInSpineMapping.add(p) # mark as visited
@@ -299,8 +305,21 @@ class KnotHandler(): # TODO: delete self variables for certain steps once they'r
                         else:
                             print("Error: First pixel found on spine wasn't assigned position")
                 else: # directions already initialized
-                    neighborsInMyDirection = [n for n in neighborsOnSpine
-                            if n not in self.pixelsVisitedInSpineMapping]
+                    # determine which neighbors are "forwards"
+                    # TODO: working here
+                    print("Analyzing {}".format(currPixel))
+                    print("  neighbors on spine: {}".format(neighborsOnSpine))
+                    neighborsInMyDirection = []
+                    for n in neighborsOnSpine:
+                        if currPixel in self.spineMapPosDir and n not in self.spineMapPosDir or \
+                                currPixel in self.spineMapNegDir and n not in self.spineMapNegDir:
+                                print("   neighbor {} is in my direction".format(n))
+                                neighborsInMyDirection.append(n)
+                    # neighborsInMyDirection = [
+                    #     n for n in neighborsOnSpine if 
+                    # ]
+                    # neighborsInMyDirection = [n for n in neighborsOnSpine #TODO: delete
+                    #         if n not in self.pixelsVisitedInSpineMapping]
                     # there might be more than one neighbor (like at a fork)
                     for nextPixel in neighborsInMyDirection:
                         if currPixel in self.spineMapPosDir:

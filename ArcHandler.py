@@ -20,6 +20,7 @@ class ArcHandler:
         self.pixelSpines = dict() # pixel to spine
         self.spineTrees = [] # for each arc, dict maps pixel => {prev => [], next => []}
         self.spineEndPoints = [] # for each arc, list of endpoints
+        self.snippedSpinePixs = set() # spine pixels that have been snipped off
         self.crossings = [] # arcNum => {endPoint => endPoint (of other arc)}
 
     # returns a linked list of the entire length of the knot
@@ -178,9 +179,13 @@ class ArcHandler:
         
         # insert all relevent values
         if prev is not None:
+            print("Set {}'s prev to {}".format(pixel, prev))
             arcSpineTree[pixel]['prev'].append(prev)
         if nxt is not None:
+            print("Set {}'s next to {}".format(pixel, nxt))
             arcSpineTree[pixel]['next'].append(nxt)
+
+        # TODO: Working here
 
     # return the array of next/prev pixels in a given spine pixel
     # returns None if pixel position not set yet with setPositionInSpine
@@ -216,7 +221,7 @@ class ArcHandler:
     def _distToSpinePixel(self, source, target):
         arcNumSource = self.getPixelArc(source)
         arcNumTarget = self.getPixelArc(target)
-        if arcNumSource is None or arcNumTarget: # not assigned to an arc
+        if arcNumSource is None or arcNumTarget is None: # not assigned to an arc
             print("Error: Pixel {} or {} doesn't have an arc".format(source, target))
             return
         if arcNumSource != arcNumTarget:
@@ -289,6 +294,67 @@ class ArcHandler:
             print("Error: Source {} couldn't reach pixel {}".format(source, target))
             return
         return dirFromSource, dist
+    
+
+    # snips pixels off of spine exclusively from source in neighbor direction
+    def snipSpine(self, joint, neighbor):
+        arcNum = self.getPixelArc(joint)
+        if arcNum is None: # not assigned to an arc
+            print("Error: Pixel {} or {} doesn't have an arc".format(source, target))
+            return
+        # get direction of cut to be made
+        prevNs = self.getPrevSpinePixels(joint)
+        nextNs = self.getNextSpinePixels(joint)
+        if len(prevNs) > 1 and len(nextNs) > 1:
+            print("Something went wrong; {} had multiple neighbors in both directions".format(joint))
+            print("Next: {}".format(nextNs))
+            print("Prev: {}".format(prevNs))
+        elif neighbor in prevNs:
+            multNs = prevNs
+            cutDir = "prev"
+        elif neighbor in nextNs:
+            multNs = nextNs
+            cutDir = "next"
+        else:
+            print("Error: Neighbor {} not found with joint {}".format(neighbor, joint))
+
+        # remove link to neighbor
+        spineTree = self.spineTrees[arcNum]
+        newNeighbors = [n for n in multNs if n != neighbor]
+        spineTree[joint][cutDir] = newNeighbors
+        print("Set spinetree[{}][{}] to {}".format(joint, cutDir, newNeighbors))
+
+        # iterate down path and delete everything
+        # BFS in batches, there might be more joints this way
+        q = [neighbor]
+        visited = set([neighbor])
+        while q:
+            # empty out a batch
+            currPixs = [pix for pix in q]
+            q = []
+            neighbors = []
+            for pix in currPixs:
+                # get neighbors of all pixels in the q
+                forwardPixels = self._getSpineNeighbors(pix, cutDir)
+                # add all neighbors to be explored
+                neighbors.extend(forwardPixels)
+            # explore each neighbor
+            for n in neighbors:
+                if n not in visited:
+                    visited.add(n)
+                    q.append(n)
+            # erase from existence all pixels in current batch
+            print("Current batch: {}".format(currPixs))
+            for pix in currPixs:
+                self.arcSpinePixels[arcNum].remove(pix)
+                del self.pixelSpines[pix]
+                del self.spineTrees[arcNum][pix]
+                self.snippedSpinePixs.add(pix)
+
+        # del self.arcSpinePixels[] = [] # arcs to spine pixels (list of sets)
+        # self.pixelSpines = dict() # pixel to spine
+        # self.spineTrees = [] # for each arc, dict maps pixel => {prev => [], next => []}
+
 
     # returns true if spine pixel p1 can reach p2 in given direction
     def _spinePixReachable(self, p1, p2, desiredDir):
@@ -344,6 +410,9 @@ class ArcHandler:
         if len(joints) == 0: # only one distinct line, only one head
             if len(heads) != 1:
                 print("Error: Something's wrong... arc {} had no joints but {} heads".format(arcNum, len(heads)))
+                for head in heads:
+                    print("Head: {}".format(head))
+                    print("   {}".format(self._getSpineNeighbors(head, 'next')))
                 return
             head = heads[0]
             line = [head]
@@ -374,7 +443,25 @@ class ArcHandler:
     def cleanSpine(self, arcNum):
         joints = self.getSpineJoints(arcNum)
 
+        # TODO: move this to self.getSpineJoints()
+        # joints (on knobs of the spine) might be theoretically equivalent
+        # two joints are the same if a j1's neighbor is j2 and a j2's neighbor
+        # is j1
+        # make sure they're all unique
+        # joints = []
+        # for j1 in initialJoints: # test each joint against the others
+        #     for j2 in joints:
+        #         j1Neighbors = 
+
+
         print("Spine {} has {} joints".format(arcNum, len(joints)))
+        for joint in joints:
+            print("  Joint: {}".format(joint))
+            print("    nexts: {}".format(self.getNextSpinePixels(joint)))
+            print("    prevs: {}".format(self.getPrevSpinePixels(joint)))
+        
+        print(self.a)
+        # ---- for testing ------
 
         # find two joints that are the furthest apart
         maxDist = 0
@@ -426,18 +513,13 @@ class ArcHandler:
 
             print('About to snip {}'.format(toSnip))
 
-            # set correct single neighbor manually
-            newNeighbors = [n for n in multNs if n not in toSnip]
+            # snip off bad neighbors and error check new neighbors
+            for neighbor in toSnip:
+                self.snipSpine(joint, neighbor)
+            newNeighbors = self._getSpineNeighbors(joint, splitDir)
             if len(newNeighbors) > 1:
                 print("Error. New neighbors is {}, but it should be no more than 1 value".format(newNeighbors))
                 return
-            spineTree[joint][splitDir] = newNeighbors
-            print("Set spinetree[{}][{}] to {}".format(joint, splitDir, newNeighbors))
-
-            # remove all pixels in that direction from pixelSpines and arcSpinePixels
-            # TODO: WORKING HERE
-            
-        
         # reset spine endpoints
         self.spineEndPoints[arcNum] = None
 
