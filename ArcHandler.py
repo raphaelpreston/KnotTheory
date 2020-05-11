@@ -337,6 +337,29 @@ class ArcHandler:
                 print("Error: Unexpected combination of params.")
                 return
 
+        # returns the direction if reachable, False otherwise
+        # also checks that our graph is formed correctly 
+        def dirJointToJoint(v1, v2):
+            myEdges = edges[v1]
+            hisEdges = edges[v2]
+
+            if (v2, "prev") in myEdges and (v2, "next") in myEdges:
+                print('Error, {} can go both ways to get to {}'.format(v1, v2))
+                return
+            elif (v2, "prev") in myEdges:
+                if (v1, "next") not in hisEdges:
+                    print("Error, {} goes 'prev' to get to {}, but he doesn't go 'next'".format(v1, v2))
+                    return
+                else:
+                    return "prev"
+            elif (v2, "next") in myEdges:
+                if (v1, "prev") not in hisEdges:
+                    print("Error, {} goes 'next' to get to {}, but he doesn't go 'prev'".format(v1, v2))
+                    return
+                else:
+                    return "next"
+
+        
         # for each joint, compute the distance to all other joints
         for sourceJoint in joints:
             nextDir = set()
@@ -406,6 +429,22 @@ class ArcHandler:
 
         # cut off extra spine from all other joints
         # for each non-jointpair joint
+        for badJoint in [joint for joint in joints if joint not in jointPair]:
+            print("Analyzing bad joint {}".format(badJoint))
+
+            # determine which neighbor should be sliced off
+            j1 = jointPair[0]
+            j2 = jointPair[1]
+            dirToJ1 = dirJointToJoint(badJoint, j1)
+            dirToJ2 = dirJointToJoint(badJoint, j2)
+
+            if not dirToJ1 and not dirToJ2:
+                print("Couldn't reach both {} and {} from {}".format(j1, j2, badJoint))
+                return
+            elif dirToJ1 and dirToJ2:
+
+        
+
         # cut off everything in the direction in which you can't reach both jointpair joints
 
 
