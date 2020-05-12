@@ -435,6 +435,61 @@ class ArcHandler:
             print("Error: This spine has multiple joints. You didn't code that possibilty in, time to do that!")
             return
 
+    # converts a given spine to a tree where the root is the middle
+    def _convertSpineToTree(self, arcNum):
+        endpoints = self.getSpineEndPoints(arcNum)
+
+        children = []
+        # step in one from each endpoint, halting if necessary
+        # if at a joint, until the other end points catches up
+        halting = set()
+        q = list(endpoints)
+        visited = set(endpoints)
+        while len(q) > 1: # stop when we're left with only one pixel
+            print("Pointers: {}".format(q))
+            # inspect batch of pointers
+            nextPixs = []
+            toVisit = set()
+            for pix in q:
+                print("  Inspecting {}".format(pix))
+                # get all neighbors
+                pixNeighbors = self.getNextSpinePixels(pix) + self.getPrevSpinePixels(pix)
+                newNeighbors = [n for n in pixNeighbors if n not in visited]
+                print("    pix neighbors: {}".format(pixNeighbors))
+                print("    new neighbors: {}".format(newNeighbors))
+                # halt if this pixel is a joint
+                if len(newNeighbors) > 1:
+                    halting.add(pix)
+                    print("    Halted.")
+                # another endpoint has reduced down to where we were halting
+                if pix in halting and any([p in pixNeighbors for p in q]):
+                    halting.remove(pix)
+                    # one pointer will be lost; they essentially combine
+                    print("    Resumed.")
+                if pix in halting:
+                    nextPixs.append(pix)
+                if pix not in halting:
+                    print("    Replacing {} with new neighbors".format(pix))
+                    nextPixs.extend(newNeighbors)
+                    toVisit.update(newNeighbors)
+            # q = list(set(nextPixs))
+            # for testing ----------- #
+            seen = set()
+            q = [x for x in nextPixs if x not in seen and not seen.add(x)]
+            # nextQ = []
+            # for p in q:
+            #     if q.count(p) == 1:
+            #         nextQ.append(p)
+            # q = [p for p in nextPixs if nextPixs.count(p) == 1]
+            visited.update(toVisit)
+        
+        if len(q) != 1:
+            print("Error, we reduced endpoints down to nothing")
+            return
+        else:
+            return q.pop(), children
+
+
     # rid spine of joints so it's only one continuous line
     def cleanSpine(self, arcNum):
         joints = self.getSpineJoints(arcNum)
@@ -458,71 +513,85 @@ class ArcHandler:
 
         # starting from the outer most joints, move inwards
         # for each joint, shrink all paths inwards one pixel at a time until
-        # one of the paths 0-length (can be done in one step)
+        # one of the paths becomes 0-length (can be done in one step)
         # maybe if the difference of the paths is greater than some degree
         # then you can assume one is a knub and reinstate the other?
 
+        # no no no do this do this
+        # start from the middle, branching out. When you hit a joint, (just realized you have to make sure joints
+        # are detected correctly aka they put themselves as children the correct way in the tree function)
+        # but basically start from middle, and move out in both dirs. Everytime we hit a joint, 
+        # use some heuristic to detect if it's a knub. If it is, then kill it and keep going.
+        # when you hit the last joint, kill both nubs.
+
+        # you could definitely do this backwards, by somehow messing with the tree function above
+
+        # convert the spine into a tree where the root is the middle
+        root, children = self._convertSpineToTree(arcNum)
+        print("Root is: {}".format(root))
+        self.a
+
 
         # find two joints that are the furthest apart
-        maxDist = 0
-        jointPair = []
-        for j1 in joints:
-            for j2 in joints:
-                _, dist = self._distToSpinePixel(j1, j2)
-                if dist > maxDist:
-                    jointPair = [j1, j2]
-                    maxDist = dist
-        print('Maximum distance: {}'.format(maxDist))
-        print('Joint pair: {}'.format(jointPair))
+        # maxDist = 0
+        # jointPair = []
+        # for j1 in joints:
+        #     for j2 in joints:
+        #         _, dist = self._distToSpinePixel(j1, j2)
+        #         if dist > maxDist:
+        #             jointPair = [j1, j2]
+        #             maxDist = dist
+        # print('Maximum distance: {}'.format(maxDist))
+        # print('Joint pair: {}'.format(jointPair))
 
-        # cut off extra spines from all joints
-        for joint in joints:
-            print("Analyzing joint {}".format(joint))
-            mainJ1 = jointPair[0]
-            mainJ2 = jointPair[1]
+        # # cut off extra spines from all joints
+        # for joint in joints:
+        #     print("Analyzing joint {}".format(joint))
+        #     mainJ1 = jointPair[0]
+        #     mainJ2 = jointPair[1]
 
-            # by definition, a joint has >1 neighbor in only a single direction
-            # because the joint was initially discovered from one direction.
-            # only one of these neighbor "paths" should lead to a j1 or j2
+        #     # by definition, a joint has >1 neighbor in only a single direction
+        #     # because the joint was initially discovered from one direction.
+        #     # only one of these neighbor "paths" should lead to a j1 or j2
 
-            # get the neighbors in the split direction of the joint
-            prevNs = self.getPrevSpinePixels(joint)
-            nextNs = self.getNextSpinePixels(joint)
-            if len(prevNs) > 1 and len(nextNs) > 1:
-                print("Something went wrong; {} had multiple neighbors in both directions".format(joint))
-                print("Next: {}".format(nextNs))
-                print("Prev: {}".format(prevNs))
-            elif len(prevNs) > 1:
-                multNs = prevNs
-                splitDir = "prev"
-            elif len(nextNs) > 1:
-                multNs = nextNs
-                splitDir = "next"
-            else:
-                print("Error: We called {} a joint but it doesn't have multiple neighbors in a direction".format(joint))
+        #     # get the neighbors in the split direction of the joint
+        #     prevNs = self.getPrevSpinePixels(joint)
+        #     nextNs = self.getNextSpinePixels(joint)
+        #     if len(prevNs) > 1 and len(nextNs) > 1:
+        #         print("Something went wrong; {} had multiple neighbors in both directions".format(joint))
+        #         print("Next: {}".format(nextNs))
+        #         print("Prev: {}".format(prevNs))
+        #     elif len(prevNs) > 1:
+        #         multNs = prevNs
+        #         splitDir = "prev"
+        #     elif len(nextNs) > 1:
+        #         multNs = nextNs
+        #         splitDir = "next"
+        #     else:
+        #         print("Error: We called {} a joint but it doesn't have multiple neighbors in a direction".format(joint))
             
-            print("Joint is split in {} direction".format(splitDir))
+        #     print("Joint is split in {} direction".format(splitDir))
 
-            # snip the connection to each neighbor that doesn't lead to a main joint
-            # via the correct direction
-            toSnip = []
-            for neighbor in multNs:
-                canReachJ1 = self._spinePixReachable(neighbor, mainJ1, splitDir)
-                canReachJ2 = self._spinePixReachable(neighbor, mainJ2, splitDir)
-                if not (canReachJ1 or canReachJ2): # can't reach either
-                    toSnip.append(neighbor)
+        #     # snip the connection to each neighbor that doesn't lead to a main joint
+        #     # via the correct direction
+        #     toSnip = []
+        #     for neighbor in multNs:
+        #         canReachJ1 = self._spinePixReachable(neighbor, mainJ1, splitDir)
+        #         canReachJ2 = self._spinePixReachable(neighbor, mainJ2, splitDir)
+        #         if not (canReachJ1 or canReachJ2): # can't reach either
+        #             toSnip.append(neighbor)
 
-            print('About to snip {}'.format(toSnip))
+        #     print('About to snip {}'.format(toSnip))
 
-            # snip off bad neighbors and error check new neighbors
-            for neighbor in toSnip:
-                self.snipSpine(joint, neighbor)
-            newNeighbors = self._getSpineNeighbors(joint, splitDir)
-            if len(newNeighbors) > 1:
-                print("Error. New neighbors is {}, but it should be no more than 1 value".format(newNeighbors))
-                return
-        # reset spine endpoints
-        self.spineEndPoints[arcNum] = None
+        #     # snip off bad neighbors and error check new neighbors
+        #     for neighbor in toSnip:
+        #         self.snipSpine(joint, neighbor)
+        #     newNeighbors = self._getSpineNeighbors(joint, splitDir)
+        #     if len(newNeighbors) > 1:
+        #         print("Error. New neighbors is {}, but it should be no more than 1 value".format(newNeighbors))
+        #         return
+        # # reset spine endpoints
+        # self.spineEndPoints[arcNum] = None
 
 
 
