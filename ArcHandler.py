@@ -185,8 +185,6 @@ class ArcHandler:
             print("Set {}'s next to {}".format(pixel, nxt))
             arcSpineTree[pixel]['next'].append(nxt)
 
-        # TODO: Working here
-
     # return the array of next/prev pixels in a given spine pixel
     # returns None if pixel position not set yet with setPositionInSpine
     # returns [] if next or prev pixels haven't been established
@@ -283,18 +281,16 @@ class ArcHandler:
                         print("nexts: {}".format(nextPixels))
                         print("prevs: {}".format(prevPixels))
                         return
+                    return dirFromSource, dist
             # explore each neighbor
             for n in neighbors:
                 if n not in visited:
                     visited.add(n)
                     q.append(n)
             dist += 1
-        
-        if dirFromSource is None:
+        if dirFromSource is None: # couldn't find
             print("Error: Source {} couldn't reach pixel {}".format(source, target))
-            return
-        return dirFromSource, dist
-    
+            return None, -1
 
     # snips pixels off of spine exclusively from source in neighbor direction
     def snipSpine(self, joint, neighbor):
@@ -459,9 +455,13 @@ class ArcHandler:
             print("  Joint: {}".format(joint))
             print("    nexts: {}".format(self.getNextSpinePixels(joint)))
             print("    prevs: {}".format(self.getPrevSpinePixels(joint)))
-        
-        print(self.a)
-        # ---- for testing ------
+
+        # starting from the outer most joints, move inwards
+        # for each joint, shrink all paths inwards one pixel at a time until
+        # one of the paths 0-length (can be done in one step)
+        # maybe if the difference of the paths is greater than some degree
+        # then you can assume one is a knub and reinstate the other?
+
 
         # find two joints that are the furthest apart
         maxDist = 0
@@ -501,10 +501,11 @@ class ArcHandler:
             else:
                 print("Error: We called {} a joint but it doesn't have multiple neighbors in a direction".format(joint))
             
+            print("Joint is split in {} direction".format(splitDir))
+
             # snip the connection to each neighbor that doesn't lead to a main joint
             # via the correct direction
             toSnip = []
-            spineTree = self.spineTrees[arcNum]
             for neighbor in multNs:
                 canReachJ1 = self._spinePixReachable(neighbor, mainJ1, splitDir)
                 canReachJ2 = self._spinePixReachable(neighbor, mainJ2, splitDir)

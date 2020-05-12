@@ -161,9 +161,10 @@ class KnotHandler(): # TODO: delete self variables for certain steps once they'r
         elif self.status == "spine-map":
             if not self.spineMapQueue: # we've run out of spine to map
                 # clean the spine
+                print(self.ah.spineTrees[self.currArcInSpineMap])
                 print("Cleaning spine {}...".format(self.currArcInSpineMap))
                 self.ah.cleanSpine(self.currArcInSpineMap)
-                # self.a
+                self.a
                 self.arcsCompletedInSpineMapping.append(self.currArcInSpineMap)
                 self.status = "spine-search"
                 print(self.status)
@@ -282,6 +283,7 @@ class KnotHandler(): # TODO: delete self variables for certain steps once they'r
                         print('Warning: Pixel {} had more than two or less than one neighbor(s): {}'.format(currPixel, neighborsOnSpine))
                 # initialize directions if necessary (implies no spine pixels are visited yet)
                 if len(self.spineMapPosDir) == 0 and len(self.spineMapNegDir) == 0:
+                    self.spineMapPosDir.add(currPixel) # count self as arrived to by "next" direction
                     if len(neighborsOnSpine) == 2: # TODO: THIS COULD BE THREE, test this
                         # choose one direction to be positive and one to be negative
                         self.spineMapPosDir.add(neighborsOnSpine[0])
@@ -289,6 +291,7 @@ class KnotHandler(): # TODO: delete self variables for certain steps once they'r
                     elif len(neighborsOnSpine) == 1:
                         # we must have hit an actual endpoint
                         self.spineMapPosDir.add(neighborsOnSpine[0])
+
                     elif len(neighborsOnSpine > 3):
                         print("You didn't code this possibility in !!!!")
                     for p in neighborsOnSpine:
@@ -307,20 +310,29 @@ class KnotHandler(): # TODO: delete self variables for certain steps once they'r
                 else: # directions already initialized
                     # determine which neighbors are "forwards"
                     # TODO: working here
+                    def toWords(b):
+                        return "IS" if b else "IS NOT"
                     print("Analyzing {}".format(currPixel))
+                    currInPos = currPixel in self.spineMapPosDir
+                    currInNeg = currPixel in self.spineMapNegDir
+                    print(" curr {} {} in positive direction".format(currPixel, toWords(currInPos)))
+                    print(" curr {} {} in negative direction".format(currPixel, toWords(currInNeg)))
                     print("  neighbors on spine: {}".format(neighborsOnSpine))
+
+                    # identify from which direction we arrived here,
+                    # neighbors "forward" are those NOT in that direction.
+                    # this also prevents double joints at joints where the first
+                    # pixels after the split are adjacent
                     neighborsInMyDirection = []
                     for n in neighborsOnSpine:
-                        if currPixel in self.spineMapPosDir and n not in self.spineMapPosDir or \
-                                currPixel in self.spineMapNegDir and n not in self.spineMapNegDir:
+                        nInPos = n in self.spineMapPosDir
+                        nInNeg = n in self.spineMapNegDir
+                        print("    {} {} in positive direction".format(n, toWords(nInPos)))
+                        print("    {} {} in negative direction".format(n, toWords(nInNeg)))
+                        if currInPos and not nInPos or currInNeg and not nInNeg:
                                 print("   neighbor {} is in my direction".format(n))
                                 neighborsInMyDirection.append(n)
-                    # neighborsInMyDirection = [
-                    #     n for n in neighborsOnSpine if 
-                    # ]
-                    # neighborsInMyDirection = [n for n in neighborsOnSpine #TODO: delete
-                    #         if n not in self.pixelsVisitedInSpineMapping]
-                    # there might be more than one neighbor (like at a fork)
+                    # there might be more than one neighbor (like at a joint)
                     for nextPixel in neighborsInMyDirection:
                         if currPixel in self.spineMapPosDir:
                             self.ah.setPositionInSpine(currPixel, nxt=nextPixel)
@@ -335,6 +347,8 @@ class KnotHandler(): # TODO: delete self variables for certain steps once they'r
                         else:
                             print("Error: Pixel {} wasn't assigned a direction in spine mapping".format(currPixel))
                             return
+                        print("now currPixel {} is {}".format(currPixel, self.ah.spineTrees[self.currArcInSpineMap][currPixel]))
+                        print("now nextPixel {} is {}".format(nextPixel, self.ah.spineTrees[self.currArcInSpineMap][nextPixel]))
                         # add next pixel to the queue & visited
                         self.spineMapQueue.append(nextPixel)
                         self.pixelsVisitedInSpineMapping.add(nextPixel)
