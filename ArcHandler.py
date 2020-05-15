@@ -376,64 +376,6 @@ class ArcHandler:
             print("Error: This spine has multiple joints. You didn't code that possibilty in, time to do that!")
             return
 
-    # snips pixels off of spine exclusively from source in neighbor direction
-    def oldSnip(self, joint, neighbor):
-        arcNum = self.getPixelArc(joint)
-        if arcNum is None: # not assigned to an arc
-            print("Error: Pixel {} or {} doesn't have an arc".format(source, target))
-            return
-        # get direction of cut to be made
-        prevNs = self.getPrevSpinePixels(joint)
-        nextNs = self.getNextSpinePixels(joint)
-        if len(prevNs) > 1 and len(nextNs) > 1:
-            print("Something went wrong; {} had multiple neighbors in both directions".format(joint))
-            print("Next: {}".format(nextNs))
-            print("Prev: {}".format(prevNs))
-        elif neighbor in prevNs:
-            multNs = prevNs
-            cutDir = "prev"
-        elif neighbor in nextNs:
-            multNs = nextNs
-            cutDir = "next"
-        else:
-            print("Error: Neighbor {} not found with joint {}".format(neighbor, joint))
-
-        # remove link to neighbor
-        spineTree = self.spineTrees[arcNum]
-        newNeighbors = [n for n in multNs if n != neighbor]
-        spineTree[joint][cutDir] = newNeighbors
-        print("Set spineTree[{}][{}] to {}".format(joint, cutDir, newNeighbors))
-
-        # iterate down path and delete everything
-        # BFS in batches, there might be more joints this way
-        q = [neighbor]
-        visited = set([neighbor])
-        while q:
-            # empty out a batch
-            currPixs = [pix for pix in q]
-            q = []
-            neighbors = []
-            for pix in currPixs:
-                # get neighbors of all pixels in the q
-                forwardPixels = self._getSpineNeighbors(pix, cutDir)
-                # add all neighbors to be explored
-                neighbors.extend(forwardPixels)
-            # explore each neighbor
-            for n in neighbors:
-                if n not in visited:
-                    visited.add(n)
-                    q.append(n)
-            # erase from existence all pixels in current batch
-            print("Current batch: {}".format(currPixs))
-            for pix in currPixs:
-                self.arcSpinePixels[arcNum].remove(pix)
-                del self.pixelSpines[pix]
-                del self.spineTrees[arcNum][pix]
-                self.snippedSpinePixs.add(pix)
-
-        # del self.arcSpinePixels[] = [] # arcs to spine pixels (list of sets)
-        # self.pixelSpines = dict() # pixel to spine
-        # self.spineTrees = [] # for each arc, dict maps pixel => {prev => [], next => []}
 
     # snip spine from endpoint up to (and potentially including) the first pixel found in lastOnes
     # it's assumed that at no point will we hit a joint that won't incude a pixel
@@ -613,7 +555,17 @@ class ArcHandler:
                         # cut all the way if it's an even split, otherwise
                         # it's a knub, so leave the last one in
                         cutLastOne = len(pointersToCut) > 1
-                        self.snipSpine(oGPointer, destinationPointers, cutLastOne)
+                        # use closest existing pixel to oGPointer on path
+                        # this way, if there was already a joint further down
+                        # one of the paths, it's effectively removed to because
+                        # we start deleting from the joint
+                        pathCopy = list(paths[oGPointer])
+                        startPoint = oGPointer
+                        while startPoint not in self.spineTrees[arcNum]:
+                            startPoint = pathCopy.pop(0)
+                        # we now have an existing startpoint
+                        print("       closest existing startpoint is {}".format(startPoint))
+                        self.snipSpine(startPoint, destinationPointers, cutLastOne)
                 if pix in halting:
                     nextPixs.append(pix) # add self back to be explored again
                 else:
