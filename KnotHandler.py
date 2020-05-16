@@ -277,8 +277,6 @@ class KnotHandler(): # TODO: delete self variables for certain steps once they'r
                 # get neighbors and error check
                 allNeighbors = self.getNeighbors(currPixel)
                 neighborsOnSpine = [n for n in allNeighbors if self.pixelIsSpine(n)]
-                if currPixel == (22,112):
-                    print('Neighbors on spine of (22,112): {}'.format(neighborsOnSpine))
                 if len(neighborsOnSpine) > 2 or len(neighborsOnSpine) < 1:
                         print('Warning: Pixel {} had more than two or less than one neighbor(s): {}'.format(currPixel, neighborsOnSpine))
                 # initialize directions if necessary (implies no spine pixels are visited yet)
