@@ -8,6 +8,7 @@
 
 # Ideas
  - Maybe not necessary to do BFS on all pixels of an arc? Just find the boundary?
+ - Instead of using equality to asses which spines to cut, use how close they are to the end too
  - Could do that by BFSing the background, going one pixel in on the found arcs, and those are are the boundary points
  - For links, the knots might be different colors. Add component functionality
  - 3D seifert surfaces plots using matplotlib

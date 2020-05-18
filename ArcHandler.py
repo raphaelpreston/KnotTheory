@@ -340,29 +340,36 @@ class ArcHandler:
     # gradient in all distinct lines (to show endpoints)
     def getSpinePaintMap(self, arcNum):
         endPoints = self.getSpineEndPoints(arcNum)
-        heads = [p for p in endPoints if self._getSpineNeighbors(p, 'next')]
+        # heads = [p for p in endPoints if self._getSpineNeighbors(p, 'next')]
         joints = self.getSpineJoints(arcNum)
 
-        # for a bunch of distinct lines
-        if len(joints) == 0: # only one distinct line, only one head
-            if len(heads) != 1:
-                print("Error: Something's wrong... arc {} had no joints but {} heads".format(arcNum, len(heads)))
-                for head in heads:
-                    print("Head: {}".format(head))
-                    print("   {}".format(self._getSpineNeighbors(head, 'next')))
+
+        if len(joints) == 0:
+            # choose source endpoint arbitrarily
+            sourceEp = endPoints[0]
+
+            # figure out which direction it goes
+            prevNs = self.getPrevSpinePixels(sourceEp)
+            nextNs = self.getNextSpinePixels(sourceEp) # TODO: getNextSpinePixels should return [] not None
+            if len(nextNs) + len(prevNs) != 1:
+                print("Error: Chosen source endpoint for paint mapping of arc {} has more or less than 1 neighbor ".format(arcNum))
                 return
-            head = heads[0]
-            line = [head]
-            currPixel = head
+            if len(nextNs) == 1:
+                direc = "next"
+            else:
+                direc = "prev"
+            
+            line = [sourceEp]
+            currPixel = sourceEp
             while True:
-                nextNeighbors = self._getSpineNeighbors(currPixel, 'next')
-                if len(nextNeighbors) == 0: # found endpoint of single line
+                neighbors = self._getSpineNeighbors(currPixel, direc)
+                if len(neighbors) == 0: # found endpoint of single line
                     break
-                if len(nextNeighbors) > 1: # no joints implies only 1 neighbor
-                    print("Error: Something's wrong... arc {} had no joints but pixel {} had {} next neighbors".format(arcNum, currPixel, len(nextNeighbors)))
+                if len(neighbors) > 1: # no joints implies only 1 neighbor
+                    print("Error: Something's wrong... arc {} had no joints but pixel {} had {} next neighbors".format(arcNum, currPixel, len(neighbors)))
                     return
-                line.append(nextNeighbors[0]) # add to line
-                currPixel = nextNeighbors[0]
+                line.append(neighbors[0]) # add to line
+                currPixel = neighbors[0]
             
             # line is now an array of pixels from head to tail
             # now, get colors for each pixel accordingly
@@ -373,7 +380,7 @@ class ArcHandler:
             return line, scaledRgbs
 
         else: # multiple distinct lines joined at each joint
-            print("Error: This spine has multiple joints. You didn't code that possibilty in, time to do that!")
+            print("Error: This spine has multiple joints. Cleaning must have failed!")
             return
 
 
@@ -433,10 +440,14 @@ class ArcHandler:
                 return
             # if we have lastOnes to kill, kill them too then return
             if len(nsInLastOnes) > 0: # we arrived to some lastOnes
+                # determine if we want to cut the last one or not
+
+                # if the potential snippee has two neighbors in one direction # TODO: working here
                 if cutLastOne:
                     if len(nsInLastOnes) > 1:
                         print("Snipping Error: More than one of currPix {}'s neighbors was a lastone".format(currPix))
                         return
+                    # determine if we actually want to snip the last one
                     # continue on to snip the lastOne
                     print('       Continuing to snip last one')
                     lastSnip = True
@@ -553,7 +564,7 @@ class ArcHandler:
                     # snip everything from OG pointers up to and including pointers involved with joint
                     for oGPointer in pointersToCut:
                         # cut all the way if it's an even split, otherwise
-                        # it's a knub, so leave the last one in
+                        # it's a knub, so leave the last one in (initially)
                         cutLastOne = len(pointersToCut) > 1
                         # use closest existing pixel to oGPointer on path
                         # this way, if there was already a joint further down
@@ -589,7 +600,7 @@ class ArcHandler:
             print("{}: {}".format(head, path))
 
         # reset endPoints
-        self.spineEndPoints[arcNum] = []
+        self.spineEndPoints[arcNum] = None
 
     # print spine tree
     def printSpineTree(self, arcNum):
