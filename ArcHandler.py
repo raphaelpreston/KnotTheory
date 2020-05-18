@@ -387,12 +387,14 @@ class ArcHandler:
     # snip spine from endpoint up to (and potentially including) the first pixel found in lastOnes
     # it's assumed that at no point will we hit a joint that won't incude a pixel
     # in lastOnes. if cutLastOne, the last one found will be killed too.
-    def snipSpine(self, ep, lastOnes, cutLastOne):
+    def snipSpine(self, ep, lastOnes, visited):
         arcNum = self.getPixelArc(ep)
         if arcNum is None: # not assigned to an arc
             print("Error: Pixel {} doesn't have an arc".format(ep)) # TODO: integrate these errors into the getting functions themselves
             return
         lastSnip = False # set to true if we have to snip exactly one more
+        pixsToFix = None # set if we have to glue together two pixels after last snip
+        dirToFix = None
         # start snipping
         currPix = ep
         while True:
@@ -405,7 +407,7 @@ class ArcHandler:
                 neighbors = prevNs + nextNs
             # mark the lastOnes that we've arrived to
             nsInLastOnes = [n for n in neighbors if n in lastOnes]
-            if len(neighbors) > 1 and len(nsInLastOnes) == 0:
+            if len(neighbors) > 1 and len(nsInLastOnes) == 0 and not lastSnip:
                 print("Snipping Error: We found a joint and none of them were in lastOnes, or currPix")
                 print("{}: {}... lastOnes: {}... self: {}".format(currPix, neighbors, lastOnes, currPix))
                 return
@@ -436,26 +438,71 @@ class ArcHandler:
             # that was our last snip
             if lastSnip:
                 print("       That was our last snip...")
+                if pixsToFix is not None:
+                    p1, p2 = pixsToFix
+                    print("       Gotta glue together {} and {}".format(p1, p2))
+
+                    # reverse dirs in the direction of the spine we already explored
+                    neighborInDir = p1 if p1 in visited else p2
+                    otherOne = p2 if p1 in visited else p1
+                    oppositeDir = "next" if dirToFix == "prev" else "prev"
+
+                    # first deal with the two pixels
+                    tempNextNsInMyDir = self._getSpineNeighbors(neighborInDir, dirToFix)
+                    print("        Storing temp {} neighbors: {}".format(dirToFix, tempNextNsInMyDir))
+                    self.spineTrees[arcNum][neighborInDir][dirToFix] = otherOne
+                    print("        Set {}'s {} to {}".format(neighborInDir, dirToFix, otherOne))
+                    self.spineTrees[arcNum][otherOne][oppositeDir] = neighborInDir
+                    print("        Set {}'s {} to {}".format(otherOne, oppositeDir, neighborInDir))
+
+                    # now traverse to end of visited spine and reverse directions
+                    currPix = neighborInDir
+                    while tempNextNsInMyDir:
+                        if len(tempNextNsInMyDir) > 1:
+                            print("Error: There was more than one neighbor when gluing!!!")
+                            return
+                        nInMyDir = tempNextNsInMyDir[0]
+                        tempNextNsInMyDir = self._getSpineNeighbors(nInMyDir, dirToFix)
+                        self.spineTrees[arcNum][currPix][oppositeDir] = nInMyDir
+                        print("        Set {}'s {} to {}".format(currPix, oppositeDir, nInMyDir))
+                        self.spineTrees[arcNum][nInMyDir][dirToFix] = currPix
+                        print("        Set {}'s {} to {}".format(nInMyDir, dirToFix, currPix))
+                        currPix = nInMyDir
+                    # finally, set last pixel to not point to anything
+                    self.spineTrees[arcNum][currPix][oppositeDir] = []
+                    print("        finally, set {}'s {} to nothing".format(currPix, oppositeDir))
+
+                    print("        Done glueing")
                 print("       Done snipping")
                 return
             # if we have lastOnes to kill, kill them too then return
             if len(nsInLastOnes) > 0: # we arrived to some lastOnes
-                # determine if we want to cut the last one or not
-
-                # if the potential snippee has two neighbors in one direction # TODO: working here
-                if cutLastOne:
-                    if len(nsInLastOnes) > 1:
+                if len(nsInLastOnes) > 1:
                         print("Snipping Error: More than one of currPix {}'s neighbors was a lastone".format(currPix))
                         return
-                    # determine if we actually want to snip the last one
-                    # continue on to snip the lastOne
-                    print('       Continuing to snip last one')
-                    lastSnip = True
-                    currPix = nsInLastOnes[0]
-                else:
-                    print("       Don't want to cut the last one...")
+                # determine if we want to cut the last one or not
+                # if the potential snippee has two neighbors in one direction,
+                # then you're not damaging anything by snipping, so snip and then
+                # glue those two neighbors together
+                potSnippee = nsInLastOnes[0]
+                potSnippeeNextNs = self.getNextSpinePixels(potSnippee)
+                potSnippeePrevNs = self.getPrevSpinePixels(potSnippee)
+                if len(potSnippeeNextNs) + len(potSnippeePrevNs) == 1:
+                    print("       Don't want to cut the last one, that would rupture the line...")
                     print("       Done snipping")
                     return
+                elif len(potSnippeeNextNs) == 2:
+                    print("       We can snip last one because it has two neighbors in next direction")
+                    lastSnip = True
+                    currPix = potSnippee
+                    pixsToFix = list(potSnippeeNextNs)
+                    dirToFix = "next"
+                elif len(potSnippeePrevNs) == 2:
+                    print("       We can snip last one because it has two neighbors in prev direction")
+                    lastSnip = True
+                    currPix = potSnippee
+                    pixsToFix = list(potSnippeePrevNs)
+                    dirToFix = "prev"
             else: # we must have only one neighbor
                 currPix = neighbors[0]
 
@@ -576,7 +623,7 @@ class ArcHandler:
                             startPoint = pathCopy.pop(0)
                         # we now have an existing startpoint
                         print("       closest existing startpoint is {}".format(startPoint))
-                        self.snipSpine(startPoint, destinationPointers, cutLastOne)
+                        self.snipSpine(startPoint, destinationPointers, visited)
                 if pix in halting:
                     nextPixs.append(pix) # add self back to be explored again
                 else:

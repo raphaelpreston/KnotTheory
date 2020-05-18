@@ -7,6 +7,19 @@
    - maybe have it to do with the line thickness?
 
 # Ideas
+ - BEFORE SKELETON ANALYSIS, GO THRU AND REMOVE EVERY UNCESSARY PIXEL, SO LIKE 
+ ```
+    101
+    010
+    011
+ ```
+    would become
+ ```
+    101
+    010
+    001
+ ```
+ idk what that'd fix but it would fix something
  - Maybe not necessary to do BFS on all pixels of an arc? Just find the boundary?
  - Instead of using equality to asses which spines to cut, use how close they are to the end too
  - Could do that by BFSing the background, going one pixel in on the found arcs, and those are are the boundary points
