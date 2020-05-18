@@ -179,10 +179,10 @@ class ArcHandler:
         
         # insert all relevent values
         if prev is not None:
-            print("Set {}'s prev to {}".format(pixel, prev))
+            # print("Set {}'s prev to {}".format(pixel, prev))
             arcSpineTree[pixel]['prev'].append(prev)
         if nxt is not None:
-            print("Set {}'s next to {}".format(pixel, nxt))
+            # print("Set {}'s next to {}".format(pixel, nxt))
             arcSpineTree[pixel]['next'].append(nxt)
 
     # return the array of next/prev pixels in a given spine pixel
