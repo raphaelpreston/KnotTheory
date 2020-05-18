@@ -3,6 +3,7 @@ from random import randint, choice
 from math import sin, cos, radians, sqrt
 import DrawTools as dtools
 import ImageTools as itools
+from AlexPoly import AlexPoly
 from ArcHandler import *
 from PyQt5.QtGui import QPainter, QColor, QPen
 from PyQt5.QtCore import Qt, QTimer
@@ -134,17 +135,15 @@ class KnotHandler(): # TODO: delete self variables for certain steps once they'r
                         print(" - {} ==> {}".format(ep1, ep2))
                 self.status = "done"
                 print(self.status)
-                # get crossings from Arc Handler
-                self.crossings = self.ah.crossings
+
                 # enumerate entire knot
-                self.knotEnumeration = self.ah.enumerateKnotLength()
-                if len(self.knotEnumeration) != len(self.ah.pixelSpines.keys()):
-                    print("Error: Enumeration ({}) and pixelSpines ({}) have different lengths".format(
-                        len(self.knotEnumeration), len(self.ah.pixelSpines.keys()
-                    )))
-                if any([len(ns) != 2 for pixel, ns in self.knotEnumeration.items()]):
-                    print("Error: A pixel doesn't have two neighbors.")
-                    return
+                self.ah.enumerateKnotLength()
+                self.knotEnumeration = self.ah.knotEnumeration
+
+                # perform calculations for what we want
+                self.alexPolyHandler = AlexPoly(self.ah)
+                # compute the various calculations
+                self.alexPolyHandler.compute()
             else:
                 for pixel, endPoints in self.spineExtensionPixelsToArc.items():
                     endPoints = list(endPoints)
@@ -177,7 +176,7 @@ class KnotHandler(): # TODO: delete self variables for certain steps once they'r
     def performTick(self):
 
         if self.status == "done":
-            return
+            pass
 
         # move our cursor in the search for arcs
         elif self.status == "arc-search":

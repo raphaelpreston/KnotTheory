@@ -22,8 +22,9 @@ class ArcHandler:
         self.spineEndPoints = [] # for each arc, list of endpoints
         self.snippedSpinePixs = set() # spine pixels that have been snipped off
         self.crossings = [] # arcNum => {endPoint => endPoint (of other arc)}
+        self.knotEnumeration = None # spinePixel => {"next": piexl, "prev": pixel}
 
-    # returns a linked list of the entire length of the knot
+    # returns a doubly linked list of the entire length of the knot
     def enumerateKnotLength(self):
         # helper function to return next pixel and new direction to travel in
         def nextPixelAndDirKey(currPixel, currDirKey):
@@ -50,8 +51,9 @@ class ArcHandler:
                     currDirKey = "prev" if currDirKey == "next" else "next"
             return nextPixels[0], currDirKey
 
-        # choose an random spine pixel
-        source = sample(self.pixelSpines.keys(), 1)[0]
+        # choose the first spine pixel
+        source = list(self.pixelSpines.keys())[0]
+        # print("Starting at source {}".format(source))
 
         # loop through until we hit source again
         nextPixel, currDirKey = nextPixelAndDirKey(source, None)
@@ -68,9 +70,22 @@ class ArcHandler:
                 "prev": lastPixel,
                 "next": nextPixel
             }
+            # print("Set {}'s {} to {}".format(currPixel, "prev", lastPixel))
+            # print("Set {}'s {} to {}".format(currPixel, "next", nextPixel))
         # nextPixel is now source
         enumeration[source]['prev'] = currPixel
-        return enumeration
+        # print("Finally, set {}'s {} to {}".format(source, "prev", currPixel))
+
+        # error check
+        if len(enumeration) != len(self.pixelSpines.keys()):
+            print("Error: Enumeration ({}) and pixelSpines ({}) have different lengths".format(
+                len(enumeration), len(self.pixelSpines.keys()
+            )))
+        if any([len(ns) != 2 for pixel, ns in enumeration.items()]):
+            print("Error: A pixel doesn't have two neighbors.")
+            return
+        
+        self.knotEnumeration = enumeration
     
     # returns true if all spine endpoints have pairs
     def allEndpointsConnected(self):
@@ -158,6 +173,10 @@ class ArcHandler:
         self.spineEndPoints[arcNum] = None # reset endpoints
         self.arcSpinePixels[arcNum].add(pixel) # arc => pixel
         self.pixelSpines[pixel] = arcNum # pixel => arc
+
+
+    def getPixelSpine(self, pixel):
+        return self.pixelArcs[pixel]
 
     # set a pixel's relative position in its (implied) arc's spine
     # use this to set initial position in spine or edit it later

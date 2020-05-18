@@ -1,6 +1,9 @@
 # slope functions adapted from
 # https://pythonprogramming.net/how-to-program-best-fit-line-machine-learning-tutorial/
 
+# sideOfPixel adapted from 
+# https://math.stackexchange.com/questions/274712/calculate-on-which-side-of-a-straight-line-is-a-given-point-located
+
 from math import sin, cos, radians, degrees, sqrt, atan, isnan, isinf
 from statistics import mean
 import numpy as np
@@ -8,7 +11,7 @@ import json
 
 # implementation of Bresenham's line drawing algorithm to return an
 # ordered array of integers from one point to another. Credit Wikipedia.
-def getPixelsBetween(x0, y0, x1, y1):
+def getPixelsBetween(x0, y0, x1, y1, inclusive=True):
     # round origin and target to nearest pixel
     x0, y0, x1, y1 = int(round(x0)), int(round(y0)), int(round(x1)), int(round(y1))
     pixels = []
@@ -24,10 +27,13 @@ def getPixelsBetween(x0, y0, x1, y1):
             _getPixelHigh(x0, y0, x1, y1, pixels)
 
     # ensure path goes from (x0,y0) to (x1,y1)
-    if pixels[0] == (x0, y0):
-        return pixels
-    else:
+    if pixels[0] != (x0, y0):
         pixels.reverse()
+    
+    # return inclusive or exclusive
+    if not inclusive:
+        return pixels[1:-1]
+    else:
         return pixels
 
 def _getPixelLow(x0, y0, x1, y1, pixels):
@@ -262,3 +268,17 @@ def getRectangle(p1, p2, radius):
     return areaPixels
 
 
+# return "left" or "right" depending on which side of imaginary line between
+# p1 and p2 that pixel is on. returns None if it's on the line
+def sideOfPixel(p1, p2, pixel):
+    x, y = pixel
+    x1, y1 = p1
+    x2, y2 = p2
+    x, y, x1, y1, x2, y2 = float(x), float(y), float(x1), float(y1), float(x2), float(y2)
+    d = (x-x1)*(y2-y1) - (y-y1)*(x2-x1)
+    if d < 0:
+        return "right" # standard graph would be left
+    elif d > 0:
+        return "left"
+    else:
+        return None
