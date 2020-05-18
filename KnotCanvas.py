@@ -23,7 +23,7 @@ class KnotCanvas(QWidget):
         fileName = givenFilePath[lastSlash+1:]
         knotsPath = givenFilePath[:lastSlash]
         
-        self.skelFilePath = "{}/skeleton_{}.png".format(knotsPath, fileName)
+        self.skelFilePath = "{}/skeletons/skeleton_{}.png".format(knotsPath, fileName)
         self.filePath = "{}/{}".format(knotsPath, fileName)
 
         # skeletonize image
@@ -90,7 +90,7 @@ class KnotCanvas(QWidget):
 
 def main(): # ignore already declared error
     app = QApplication(sys.argv)
-    ex = KnotCanvas('knots/mediumKnot.png', 10)
+    ex = KnotCanvas('knots/hand.png', 10000)
     sys.exit(app.exec_())
 
     # TODO: add some functionality to tell if the endpoitn finding has failed (maybe original arc thickness)

@@ -6,10 +6,10 @@ from random import sample
 
 # number of points to cut off from end of spine for the linear regression
 # to make the line that extends out from the tip of the arc
-POINTS_TO_CUT = 0
+POINTS_TO_CUT = 5
 
 # number of points towards the endpoint to be used for linear regression
-POINTS_FOR_LINREG = 10
+POINTS_FOR_LINREG = 20
 
 class ArcHandler:
     def __init__(self):
@@ -20,6 +20,7 @@ class ArcHandler:
         self.pixelSpines = dict() # pixel to spine
         self.spineTrees = [] # for each arc, dict maps pixel => {prev => [], next => []}
         self.spineEndPoints = [] # for each arc, list of endpoints
+        self.snippedSpinePixs = set() # spine pixels that have been snipped off
         self.crossings = [] # arcNum => {endPoint => endPoint (of other arc)}
 
     # returns a linked list of the entire length of the knot
@@ -178,8 +179,10 @@ class ArcHandler:
         
         # insert all relevent values
         if prev is not None:
+            # print("Set {}'s prev to {}".format(pixel, prev))
             arcSpineTree[pixel]['prev'].append(prev)
         if nxt is not None:
+            # print("Set {}'s next to {}".format(pixel, nxt))
             arcSpineTree[pixel]['next'].append(nxt)
 
     # return the array of next/prev pixels in a given spine pixel
@@ -194,16 +197,17 @@ class ArcHandler:
             return
         if pixel not in self.pixelSpines: # not assigned to a spine
             print("Warning: Pixel {} is not a spine pixel".format(pixel))
-        if self.pixelSpines[pixel] != arcNum: # assigned to another spine
-            print("Error: Pixel {} is not a spine pixel for arc {}, rather for {}".format(pixel, arcNum, self.pixelSpines[pixel]))
-            return
+        else:
+            if self.pixelSpines[pixel] != arcNum: # assigned to another spine
+                print("Error: Pixel {} is not a spine pixel for arc {}, rather for {}".format(pixel, arcNum, self.pixelSpines[pixel]))
+                return
         if arcNum >= len(self.arcPixels): # not initalized with forceInitialized yet
             print("Error: Arc {} hasn't been initialized yet")
             return None
         arcSpineTree = self.spineTrees[arcNum]
         if pixel not in arcSpineTree:
             return None
-        # return the correct direction
+        # return neighbors from the correct direction
         return arcSpineTree[pixel][d]
 
     def getNextSpinePixels(self, pixel):
@@ -211,6 +215,88 @@ class ArcHandler:
 
     def getPrevSpinePixels(self, pixel):
         return self._getSpineNeighbors(pixel, "prev")
+
+    # returns (dir, dist) pair
+    def _distToSpinePixel(self, source, target):
+        arcNumSource = self.getPixelArc(source)
+        arcNumTarget = self.getPixelArc(target)
+        if arcNumSource is None or arcNumTarget is None: # not assigned to an arc
+            print("Error: Pixel {} or {} doesn't have an arc".format(source, target))
+            return
+        if arcNumSource != arcNumTarget:
+            print("Error: Pixels {} and {} are in different arcs".format(source, target))
+            return
+        arcNum = arcNumSource
+        if source not in self.pixelSpines: # not assigned to a spine
+            print("Warning: Source {} is not a spine pixel".format(source))
+            return
+        if target not in self.pixelSpines: # not assigned to a spine
+            print("Warning: Target {} is not a spine pixel".format(source))
+            return
+        if self.pixelSpines[source] != arcNum: # assigned to another spine
+            print("Error: Source {} is not a spine pixel for arc {}, rather for {}".format(source, arcNum, self.pixelSpines[source]))
+            return
+        if self.pixelSpines[target] != arcNum: # assigned to another spine
+            print("Error: Target {} is not a spine pixel for arc {}, rather for {}".format(target, arcNum, self.pixelSpines[target]))
+            return
+        if arcNum >= len(self.arcPixels): # not initalized with forceInitialized yet
+            print("Error: Arc {} hasn't been initialized yet")
+            return None
+
+        print("Computing distance from {} to {}".format(source, target))
+        if source == target:
+            return None, 0
+
+        # essentially BFS out in both directions until we explored everywhere
+        dirFromSource = None
+        nextDir = set()
+        prevDir = set() # keep track of directions of pixels
+        dist = 0
+        q = [source]
+        visited = set([source])
+        while q: # BFS out in batches at a time
+            # empty out a batch
+            currPixs = [pix for pix in q]
+            q = []
+            neighbors = []
+            for pix in currPixs:
+                # get neighbors of all pixels in the q
+                nextPixels = self.getNextSpinePixels(pix)
+                prevPixels = self.getPrevSpinePixels(pix)
+                # keep track of directionality
+                nextDir.update(nextPixels)
+                prevDir.update(prevPixels)
+                # add all neighbors to be explored
+                neighbors.extend(nextPixels + prevPixels)
+                # see if we've hit our target
+                if pix == target:
+                    if dirFromSource is not None:
+                        print("Error, found multiple ways to get from {} to {}".format(source, target))
+                        return
+                    if pix in nextDir:
+                        dirFromSource = "next"
+                    elif pix in prevDir:
+                        dirFromSource = "prev"
+                    else:
+                        print("Error: No direction found for {}".format(pix))
+                        print("nexts: {}".format(nextPixels))
+                        print("prevs: {}".format(prevPixels))
+                        return
+                    return dirFromSource, dist
+            # explore each neighbor
+            for n in neighbors:
+                if n not in visited:
+                    visited.add(n)
+                    q.append(n)
+            dist += 1
+        if dirFromSource is None: # couldn't find
+            print("Error: Source {} couldn't reach pixel {}".format(source, target))
+            return None, -1
+
+    # returns true if spine pixel p1 can reach p2 in given direction
+    def _spinePixReachable(self, p1, p2, desiredDir):
+        actualDir, dist = self._distToSpinePixel(p1, p2)
+        return actualDir == desiredDir
 
     def getSpineEndPoints(self, arcNum):
         if arcNum is None:
@@ -244,32 +330,46 @@ class ArcHandler:
         self.spineEndPoints[arcNum] = list(ones)
         return ones
 
+    # retusns the spine joints of a given arcNum
+    def getSpineJoints(self, arcNum):
+        spinePixels = self.getArcPixels(arcNum, spine=True)
+        return [p for p in spinePixels
+            if len(self._getSpineNeighbors(p, 'prev') + self._getSpineNeighbors(p, 'next')) > 2]
+
     # return pixels, colors for a spine map in order to display a color
     # gradient in all distinct lines (to show endpoints)
     def getSpinePaintMap(self, arcNum):
-        spinePixels = self.getArcPixels(arcNum, spine=True)
         endPoints = self.getSpineEndPoints(arcNum)
-        heads = [p for p in endPoints if self._getSpineNeighbors(p, 'next')]
-        joints = [p for p in spinePixels
-            if len(self._getSpineNeighbors(p, 'prev') + self._getSpineNeighbors(p, 'next')) > 2]
+        # heads = [p for p in endPoints if self._getSpineNeighbors(p, 'next')]
+        joints = self.getSpineJoints(arcNum)
 
-        # for a bunch of distinct lines
-        if len(joints) == 0: # only one distinct line, only one head
-            if len(heads) != 1:
-                print("Error: Something's wrong... arc {} had no joints but {} heads".format(arcNum, len(heads)))
+
+        if len(joints) == 0:
+            # choose source endpoint arbitrarily
+            sourceEp = endPoints[0]
+
+            # figure out which direction it goes
+            prevNs = self.getPrevSpinePixels(sourceEp)
+            nextNs = self.getNextSpinePixels(sourceEp) # TODO: getNextSpinePixels should return [] not None
+            if len(nextNs) + len(prevNs) != 1:
+                print("Error: Chosen source endpoint for paint mapping of arc {} has more or less than 1 neighbor ".format(arcNum))
                 return
-            head = heads[0]
-            line = [head]
-            currPixel = head
+            if len(nextNs) == 1:
+                direc = "next"
+            else:
+                direc = "prev"
+            
+            line = [sourceEp]
+            currPixel = sourceEp
             while True:
-                nextNeighbors = self._getSpineNeighbors(currPixel, 'next')
-                if len(nextNeighbors) == 0: # found endpoint of single line
+                neighbors = self._getSpineNeighbors(currPixel, direc)
+                if len(neighbors) == 0: # found endpoint of single line
                     break
-                if len(nextNeighbors) > 1: # no joints implies only 1 neighbor
-                    print("Error: Something's wrong... arc {} had no joints but pixel {} had {} next neighbors".format(arcNum, currPixel, len(nextNeighbors)))
+                if len(neighbors) > 1: # no joints implies only 1 neighbor
+                    print("Error: Something's wrong... arc {} had no joints but pixel {} had {} next neighbors".format(arcNum, currPixel, len(neighbors)))
                     return
-                line.append(nextNeighbors[0]) # add to line
-                currPixel = nextNeighbors[0]
+                line.append(neighbors[0]) # add to line
+                currPixel = neighbors[0]
             
             # line is now an array of pixels from head to tail
             # now, get colors for each pixel accordingly
@@ -280,16 +380,275 @@ class ArcHandler:
             return line, scaledRgbs
 
         else: # multiple distinct lines joined at each joint
-            # for each joint, BFS out from it (all joints at the same time), keeping track of each pixel's distinct line
-            # when you reach an end, then you've completed a distinct line
-            # if you reach a pixel you've already visited, then combine that pixel's line with yours
-            # then you have all your distinct lines
-            # next, choose any joint to start at, assign it a color
-            # then, for each line that starts at that joint, assign the end of it a different color
-            # if that end is another joint, repeat the process. Otherwise done.
-            print("Error: This spine has multiple joints. You didn't code that possibilty in, time to do that!")
+            print("Error: This spine has multiple joints. Cleaning must have failed!")
             return
+
+
+    # snip spine from endpoint up to (and potentially including) the first pixel found in lastOnes
+    # it's assumed that at no point will we hit a joint that won't incude a pixel
+    # in lastOnes. if cutLastOne, the last one found will be killed too.
+    def snipSpine(self, ep, lastOnes, visited):
+        arcNum = self.getPixelArc(ep)
+        if arcNum is None: # not assigned to an arc
+            print("Error: Pixel {} doesn't have an arc".format(ep)) # TODO: integrate these errors into the getting functions themselves
+            return
+        lastSnip = False # set to true if we have to snip exactly one more
+        pixsToFix = None # set if we have to glue together two pixels after last snip
+        dirToFix = None
+        # start snipping
+        currPix = ep
+        while True:
+            print("      Snipping {}".format(currPix))
+            prevNs = self.getPrevSpinePixels(currPix)
+            nextNs = self.getNextSpinePixels(currPix) # TODO: getNextSpinePixels should return [] not None
+            if nextNs is None and prevNs is None:
+                neighbors = []
+            else:
+                neighbors = prevNs + nextNs
+            # mark the lastOnes that we've arrived to
+            nsInLastOnes = [n for n in neighbors if n in lastOnes]
+            if len(neighbors) > 1 and len(nsInLastOnes) == 0 and not lastSnip:
+                print("Snipping Error: We found a joint and none of them were in lastOnes, or currPix")
+                print("{}: {}... lastOnes: {}... self: {}".format(currPix, neighbors, lastOnes, currPix))
+                return
+            
+            # remove connection to and from all neighbors, and remove self from map
+            for n in neighbors:
+                if n in prevNs and n in nextNs:
+                    print("Error, currPix {} was in both prev and next neighbors".format(currPix))
+                    return
+                if n in prevNs:
+                    dirToMe = "next"
+                elif n in nextNs:
+                    dirToMe = "prev"
+                self.spineTrees[arcNum][n][dirToMe].remove(currPix)
+                print("       Removed {} from spineTrees[{}][{}][{}]".format(currPix, arcNum, n, dirToMe))
+            del self.spineTrees[arcNum][currPix]
+            print('       Deleted {} from spineTrees[{}]'.format(currPix, arcNum))
+            
+            # delete self from sets of spine pixels
+            self.arcSpinePixels[arcNum].remove(currPix)
+            print('       Removed {} from arcSpinePixels[{}]'.format(currPix, arcNum))
+            del self.pixelSpines[currPix]
+            print('       Deleted {} from pixelSpines'.format(currPix))
+
+            # record as snipped pixel
+            self.snippedSpinePixs.add(currPix)
+
+            # that was our last snip
+            if lastSnip:
+                print("       That was our last snip...")
+                if pixsToFix is not None:
+                    p1, p2 = pixsToFix
+                    print("       Gotta glue together {} and {}".format(p1, p2))
+
+                    # reverse dirs in the direction of the spine we already explored
+                    neighborInDir = p1 if p1 in visited else p2
+                    otherOne = p2 if p1 in visited else p1
+                    oppositeDir = "next" if dirToFix == "prev" else "prev"
+
+                    # first deal with the two pixels
+                    tempNextNsInMyDir = self._getSpineNeighbors(neighborInDir, dirToFix)
+                    print("        Storing temp {} neighbors: {}".format(dirToFix, tempNextNsInMyDir))
+                    self.spineTrees[arcNum][neighborInDir][dirToFix] = otherOne
+                    print("        Set {}'s {} to {}".format(neighborInDir, dirToFix, otherOne))
+                    self.spineTrees[arcNum][otherOne][oppositeDir] = neighborInDir
+                    print("        Set {}'s {} to {}".format(otherOne, oppositeDir, neighborInDir))
+
+                    # now traverse to end of visited spine and reverse directions
+                    currPix = neighborInDir
+                    while tempNextNsInMyDir:
+                        if len(tempNextNsInMyDir) > 1:
+                            print("Error: There was more than one neighbor when gluing!!!")
+                            return
+                        nInMyDir = tempNextNsInMyDir[0]
+                        tempNextNsInMyDir = self._getSpineNeighbors(nInMyDir, dirToFix)
+                        self.spineTrees[arcNum][currPix][oppositeDir] = nInMyDir
+                        print("        Set {}'s {} to {}".format(currPix, oppositeDir, nInMyDir))
+                        self.spineTrees[arcNum][nInMyDir][dirToFix] = currPix
+                        print("        Set {}'s {} to {}".format(nInMyDir, dirToFix, currPix))
+                        currPix = nInMyDir
+                    # finally, set last pixel to not point to anything
+                    self.spineTrees[arcNum][currPix][oppositeDir] = []
+                    print("        finally, set {}'s {} to nothing".format(currPix, oppositeDir))
+
+                    print("        Done glueing")
+                print("       Done snipping")
+                return
+            # if we have lastOnes to kill, kill them too then return
+            if len(nsInLastOnes) > 0: # we arrived to some lastOnes
+                if len(nsInLastOnes) > 1:
+                        print("Snipping Error: More than one of currPix {}'s neighbors was a lastone".format(currPix))
+                        return
+                # determine if we want to cut the last one or not
+                # if the potential snippee has two neighbors in one direction,
+                # then you're not damaging anything by snipping, so snip and then
+                # glue those two neighbors together
+                potSnippee = nsInLastOnes[0]
+                potSnippeeNextNs = self.getNextSpinePixels(potSnippee)
+                potSnippeePrevNs = self.getPrevSpinePixels(potSnippee)
+                if len(potSnippeeNextNs) + len(potSnippeePrevNs) == 1:
+                    print("       Don't want to cut the last one, that would rupture the line...")
+                    print("       Done snipping")
+                    return
+                elif len(potSnippeeNextNs) == 2:
+                    print("       We can snip last one because it has two neighbors in next direction")
+                    lastSnip = True
+                    currPix = potSnippee
+                    pixsToFix = list(potSnippeeNextNs)
+                    dirToFix = "next"
+                elif len(potSnippeePrevNs) == 2:
+                    print("       We can snip last one because it has two neighbors in prev direction")
+                    lastSnip = True
+                    currPix = potSnippee
+                    pixsToFix = list(potSnippeePrevNs)
+                    dirToFix = "prev"
+            else: # we must have only one neighbor
+                currPix = neighbors[0]
+
+
+    # rid spine of joints so it's only one continuous line
+    def cleanSpine(self, arcNum):
+
+        # TODO: move up
+        VARIATION_REQUIRED = .25 # if the smaller path is less than 25% smaller
+
+        # intuition here is that for each joint, you want to cut the smaller path, or both.
+        # keep a pointer at each end point. shrink towards center step by step.
+        # if a pointer hits a joint, wait. when the partner pointer arrives, if
+        # the lengths of the two paths are less than VARIATION_OK, kill them both.
+        # otherwise, kill only the smaller one. Done when all pointers intersect.
+        endpoints = self.getSpineEndPoints(arcNum)
+
+        # step in one from each endpoint, halting if necessary
+        # if at a joint, until the other end points catches up
+        halting = set()
+        q = list(endpoints)
+        visited = set(endpoints)
+        paths = {ep: [] for ep in endpoints} # paths from each endpoint (and joint, as necessary)
+        onPaths = {ep: ep for ep in endpoints} # maps pixel to whichever original pointers path it's on
+        while len(q) > 1: # stop when we're left with one pixel or none
+            print("Pointers: {}".format(q))
+            # inspect batch of pointers
+            nextPixs = []
+            toVisit = set()
+            for pix in q:
+                print("  Inspecting {}".format(pix))
+                # get all neighbors
+                nextNs = self.getNextSpinePixels(pix)
+                prevNs = self.getPrevSpinePixels(pix)
+                if nextNs is None and prevNs is None:
+                    # we must be at a joint and this pointer's path must have been deleted
+                    pixNeighbors = []
+                else:
+                    pixNeighbors = nextNs + prevNs
+                newNeighbors = [n for n in pixNeighbors if n not in visited]
+                print("    new neighbors: {}".format(newNeighbors))
+                print("    all neighbors: {}".format(pixNeighbors))
+                # halt if this pixel is a joint
+                # if len(newNeighbors) > 1:
+                if len(pixNeighbors) > 2: # have to check behind us too
+                    halting.add(pix)
+                    print("    Halted.")
+                # test if another endpoint has reduced down to where we were halting
+                # and potentially resume and compare paths
+                pixOGPointer = onPaths[pix]
+                pixPath = paths[pixOGPointer] # TODO: honestly make a function for this lol
+                # look for nearby pointers, or nearby visited pixels not visited by pix
+                involvedNeighbors = [n for n in pixNeighbors if n in q or n in visited and n != pixOGPointer and n not in pixPath]
+                # involvedNeighbors = [n for n in pixNeighbors if n in q]
+                if pix in halting and len(involvedNeighbors) > 0: # TODO: WORKING HERE
+                    # pointer neighbors isn't good enough to check. we have to check if any neighbors have been visited at all
+                    halting.remove(pix)
+                    # since only one pixel in each joint has multiple neighbors,
+                    # all but one pointer will be lost because their newNeighbors
+                    # will be nothing or the same neighbor will be added twice
+                    # this also prevents multiple triggers on the same joint
+                    print("    Resumed.")
+                    print("    Paths:")
+                    # cut relevent paths
+                    # compare all paths against each other because
+                    # >2-joints possible at double knubs # TODO: TEST THIS
+                    pointersToCut = set()
+                    allPointersHere = [pix] + involvedNeighbors
+                    print("    All the pointers involved here are: {}".format(allPointersHere))
+                    for i in range(len(allPointersHere)):
+                        pointer1 = allPointersHere[i]
+                        for j in range(i+1, len(allPointersHere)):
+                            pointer2 = allPointersHere[j]
+                            print("      checking pointer {} against {}".format(pointer1, pointer2))
+                            p1OGPointer = onPaths[pointer1]
+                            p1Path = paths[p1OGPointer]
+                            print("     P1's path:")
+                            print("      {}: {}".format(p1OGPointer, p1Path))
+                            p2OGPointer = onPaths[pointer2]
+                            p2Path = paths[p2OGPointer]
+                            print("     P2's path:")
+                            print("      {}: {}".format(p2OGPointer, p2Path))
+                            # determine which path to cut
+                            p1Len = len(p1Path)
+                            p2Len = len(p2Path) # TODO: restructure these into if statements
+                            longerPath = p1Path if p1Len >= p2Len else p2Path
+                            shorterPath = p2Path if p1Len >= p2Len else p1Path
+                            diff = len(longerPath) - len(shorterPath)
+                            percentSmaller = float(diff) / float(len(longerPath))
+                            print("     The diff between paths is {}".format(diff))
+                            longerP = pointer1 if p1Path == longerPath else pointer2 # ---- for testing -----
+                            shorterP = pointer2 if p1Path == longerPath else pointer1
+                            print("     That means {}'s path is {} percent shorter than {}'s path".format(shorterP, int(percentSmaller*100), longerP))
+                            # if the paths are close enough, snip both
+                            destinationPointers = set()
+                            if percentSmaller < VARIATION_REQUIRED:
+                                pointersToCut.update([p1OGPointer, p2OGPointer])
+                                destinationPointers.update([shorterP, longerP]) # analogous to pointer1 and pointer2
+                                print("     So, add them both to be snipped")
+                            else: # smaller one is assumed to be a knub
+                                shorterOGPointer = p2OGPointer if p1Len >= p2Len else p1OGPointer
+                                destinationPointers.add(shorterP)
+                                pointersToCut.add(shorterOGPointer)
+                                print("     So, just add {} to be snipper".format(shorterOGPointer))
+                    print("    After all that, here's whats going to be snipped: {}, until we hit anything in heree: {}".format(pointersToCut, destinationPointers))
+                    # snip everything from OG pointers up to and including pointers involved with joint
+                    for oGPointer in pointersToCut:
+                        # cut all the way if it's an even split, otherwise
+                        # it's a knub, so leave the last one in (initially)
+                        cutLastOne = len(pointersToCut) > 1
+                        # use closest existing pixel to oGPointer on path
+                        # this way, if there was already a joint further down
+                        # one of the paths, it's effectively removed to because
+                        # we start deleting from the joint
+                        pathCopy = list(paths[oGPointer])
+                        startPoint = oGPointer
+                        while startPoint not in self.spineTrees[arcNum]:
+                            startPoint = pathCopy.pop(0)
+                        # we now have an existing startpoint
+                        print("       closest existing startpoint is {}".format(startPoint))
+                        self.snipSpine(startPoint, destinationPointers, visited)
+                if pix in halting:
+                    nextPixs.append(pix) # add self back to be explored again
+                else:
+                    print("    Replacing {} with new neighbors".format(pix))
+                    for newNeighbor in newNeighbors:
+                        # add to be explored
+                        nextPixs.append(newNeighbor)
+                        # mark as visited
+                        toVisit.add(newNeighbor)
+                        # update paths
+                        myOGPointer = onPaths[pix]
+                        paths[myOGPointer].append(newNeighbor) # add it to the path
+                        onPaths[newNeighbor] = myOGPointer # point neighbors to same OG pointer
+            # q = list(set(nextPixs))
+            # TODO: for testing ----------- #
+            seen = set()
+            q = [x for x in nextPixs if x not in seen and not seen.add(x)]
+            visited.update(toVisit)
         
+        for head, path in paths.items():
+            print("{}: {}".format(head, path))
+
+        # reset endPoints
+        self.spineEndPoints[arcNum] = None
+
     # print spine tree
     def printSpineTree(self, arcNum):
         print(self.spineTrees[arcNum]) # todo, print ordered tree from an endpoint
