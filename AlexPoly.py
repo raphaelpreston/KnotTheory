@@ -1,16 +1,26 @@
 import ImageTools as it
+from sympy import symbols, Matrix, init_printing
 
 # (traveled, not absolute), length of line created by the pixels on i to test
 # handedness of crossing
 I_LINE_LEN = 10
 
+# printing method adapted from
+# https://stackoverflow.com/questions/13214809/pretty-print-2d-python-list
+def pm(A):
+    if type(A) is Matrix:
+        A = A.tolist()
+    print('\n'.join(['\t'.join([str(cell) for cell in row]) for row in A]))
+
+
 class AlexPoly:
     # takes an arcHandler
     def __init__(self, ah):
         self.ah = ah
-        # self.matrix = []
+        self.matrix = None # nxn 2d matrix
         self.ijkCrossings = None # crossingNumber => {"i": {arcNum}, "j"..., "k"...}
         self.handedness = None # crossingNumber => "RH" or "LH"
+        self.poly = None
 
         # todo: maybe smart to get the endpoitns for all i,j,k and store them for future use?
 
@@ -52,8 +62,8 @@ class AlexPoly:
                 else:
                     print("Error: Supposed EP connection wasn't in any neighbors")
                     return
-                print("Arc {} i,j,k connections:".format(myArcNum))
-                print("  i: {}\n  j: {}\n  k: {}".format(i, j, k))
+                # print("Arc {} i,j,k connections:".format(myArcNum))
+                # print("  i: {}\n  j: {}\n  k: {}".format(i, j, k))
 
                 # add to set
                 if (i, j, k) not in ijkTuples:
@@ -94,9 +104,9 @@ class AlexPoly:
             # get j and k endpoints
             jEp, kEp = getJKPoints(j, k)
 
-            print("Checking crossing {}: {}".format(crossingNum, ijkCrossingData))
-            print(" jEP: {}".format(jEp))
-            print(" kEP: {}".format(kEp))
+            # print("Checking crossing {}: {}".format(crossingNum, ijkCrossingData))
+            # print(" jEP: {}".format(jEp))
+            # print(" kEP: {}".format(kEp))
 
             # get points on i to form imaginary line
             # figure out which pixels are between the endpoints # TODO: THIS IS A kinda COPY PASTE FROM ABOVE
@@ -138,18 +148,55 @@ class AlexPoly:
                     nextsUp.append(nextN)
                 currPixs = nextsUp
             
-            print("pos: {}\nneg: {}".format(posLine, negLine))
+            # print("pos: {}\nneg: {}".format(posLine, negLine))
             # last of the neg -> last of the pos
             p1 = negLine[-1]
             p2 = posLine[-1]
 
-            print("Calling sideOfPixel({}, {}, {})".format(p1, p2, jEp))
+            # print("Calling sideOfPixel({}, {}, {})".format(p1, p2, jEp))
             sideOfPixel = it.sideOfPixel(p1, p2, jEp)
             if sideOfPixel == None:
                 print("Error: pixel {} is on the line".format(jEp))
                 return
-            print("got {}".format(sideOfPixel))
+            # print("got {}".format(sideOfPixel))
             self.handedness[crossingNum] = sideOfPixel
+
+    def getMatrix(self):
+        # initialize matrix
+        n = len(self.ijkCrossings) # same as number of arcs
+        A = [[0 for _ in range(n)] for _ in range(n)]
+        t = symbols('t')
+        # each row corresponds to a crossing
+        for crossingNum in range(n):
+            row = A[crossingNum]
+            i = self.ijkCrossings[crossingNum]["i"]
+            j = self.ijkCrossings[crossingNum]["j"]
+            k = self.ijkCrossings[crossingNum]["k"]
+
+            # 1-t in the ith col
+            row[i] = 1-t
+            if self.handedness[crossingNum] == "right":
+                row[j] = -1 # -1 in jth col
+                row[k] = t # t in kth col
+            elif self.handedness[crossingNum] == "left":
+                row[j] = t # t in jth col
+                row[k] = -1 # -1 in kth col
+            else:
+                print("Error: Unrecognized handedness.")
+                return
+        print("Raw Matrix:")
+        pm(A)
+
+        # remove last row and column to get Alexander Matrix
+        aMat = Matrix(A)
+        # aMat = [[A[row][col] for col in range(n)] for row in range(n)]
+        aMat.col_del(n-1)
+        aMat.row_del(n-1)
+        
+        self.matrix = aMat
+
+    def getPoly(self):
+        self.poly = self.matrix.det()
 
 
     def compute(self):
@@ -160,11 +207,16 @@ class AlexPoly:
         self.getHandedness()
         print("Handedness")
         print(self.handedness)
-        
-        # self.getMatrix()
-
+        self.getMatrix()
+        print("Alexander Matrix:")
+        pm(self.matrix)
+        print(self.matrix.tolist())
+        self.getPoly()
+        print("Polynomial:")
+        print(self.poly)
 
 
 if __name__ == "__main__":
     from KnotCanvas import main
     main()
+
