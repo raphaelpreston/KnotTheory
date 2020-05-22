@@ -144,6 +144,7 @@ class KnotHandler(): # TODO: delete self variables for certain steps once they'r
                 self.knotEnumeration = self.ah.knotEnumeration
                 ijkCrossings = self.ah.ijkCrossings
                 handedness = self.ah.handedness
+                ijkCrossingNs = self.ah.ijkCrossingNs
 
                 # error check
                 if any([h != "left" and h != "right" for h in handedness]):
@@ -152,14 +153,17 @@ class KnotHandler(): # TODO: delete self variables for certain steps once they'r
                     return
 
                 print("IJK Crossings:")
-                print(ijkCrossings)
+                for ind, c in enumerate(ijkCrossings):
+                    print("{}: {}".format(ind, c))
+
+                print("IJK Crossing Neighbors:")
+                for ind, c in enumerate(ijkCrossingNs):
+                    print("{}: {}".format(ind, c))
 
                 print("Handedness")
                 print(handedness)
 
                 print("------------- Alexander Polynomial -------------")
-
-                # perform alexander polynomial calculations
                 alexPoly = APolTools.compute(ijkCrossings, handedness)
                 print("Alex Polynomial:")
                 print(alexPoly)
