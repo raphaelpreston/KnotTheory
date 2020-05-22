@@ -30,12 +30,13 @@ class ArcHandler:
         self.ijkCrossings = None # crossingNumber => {"i": {arcNum}, "j"..., "k"...}
         self.handedness = [] # "left" or "right"
 
-    # figures out ijkCrossings, handedness
-    # requires that self.knotEnumeratino exists
+    # figures out ijkCrossings, handedness. crossing numbers are in a cyclical
+    # order. requires that self.knotEnumeration exists
     def getIJKCrossingsAndHandedness(self):
-        ijkTuples = [] # tuples of (i,j,k)
+        ijkTuples = [] # tuples of (i,j,k), same order as ijkPoints
+        ijkPoints = [] # tuples of (iPoint, jEndPoint, kEp)
         crossingsSeen = set()
-        self.handedness = [] # reset
+        handedness = [] # reset
         # for each arcNum
         for myArcNum, data in enumerate(self.crossings):
             # for each arc it connects to
@@ -74,20 +75,24 @@ class ArcHandler:
                 i = spinesBetween[0]
                 if otherEp == myEpNext: # goes from myEp to otherEp
                     j, k = myArcNum, otherArcNum
-                    jEp = myEp
+                    jEp, kEp = myEp, otherEp
                 elif otherEp == myEpPrev: # goes from otherEp to myEp
                     k, j = myArcNum, otherArcNum
-                    jEp = otherEp
+                    jEp, kEp = otherEp, myEp
                 else:
                     print("Error: Supposed EP connection wasn't in any neighbors")
                     return
                 
-                # record the i,j,k values
-                ijkTuples.append((i, j, k)) 
+                # get i point between j and k endpoints
+                iPoint = pixsOnI.pop() # arbitrary
+
+                # record the i,j,k values and relevent points
+                ijkTuples.append((i, j, k))
+                ijkPoints.append((iPoint, jEp, kEp))
                 
                 # figure out handedness
                 # form imaginary line on i around the pixels on i between j & k
-                iPoint = pixsOnI.pop() # arbitrary
+                
 
                 # traverse both ways down i to form imaginary line
                 nextN = self.knotEnumeration[iPoint]["next"]
@@ -125,12 +130,73 @@ class ArcHandler:
                     print("Error: pixel {} is on the line".format(jEp))
                     return
                 # appending to handedness does preserve order
-                self.handedness.append(pixelOnSide)
+                handedness.append(pixelOnSide)
         # convert into ijkCrossings
-        self.ijkCrossings = [] # reset
+        ijkCrossings = [] # reset
         for i, j, k in ijkTuples:
-            self.ijkCrossings.append({"i": i, "j": j, "k": k})
-            
+            ijkCrossings.append({"i": i, "j": j, "k": k})
+
+        # sort knot crossings directionally
+        # for simplicity, record all j points, map j & k points to crossing nums
+        allJs = set([jEp for (_, jEp, _) in ijkPoints])
+        jEpToCrossingNum = dict()
+        kEpToCrossingNum = dict()
+        for crossingNum in range(len(ijkPoints)): # for each crossing num
+            print("{}: {}".format(crossingNum, ijkPoints[crossingNum]))
+            _, j, k = ijkCrossings[crossingNum]
+            _, jEp, kEp = ijkPoints[crossingNum]
+            jEpToCrossingNum[jEp] = crossingNum
+            kEpToCrossingNum[kEp] = crossingNum
+        if len(jEpToCrossingNum) != len(allJs):
+            print("Error: Length of all Js differs from jEpToCrossingNum")
+            return
+
+        print("Unsorted crossings:")
+        for crossing in ijkCrossings:
+            print(crossing)
+        print("Unsorted handedness: {}".format(handedness))
+        print("all js: {}".format(allJs))
+        print("js to crossings: {}".format(jEpToCrossingNum))
+        print("ks to crossings: {}".format(kEpToCrossingNum))
+
+        # given a pixel, return closest pixel that is some crossing's 'j' pixel
+        # in the "next" direction
+        def skipToJ(pix):
+            currPix = self.knotEnumeration[pix]['next']
+            while currPix not in allJs: # have yet to reach a j pixel
+                currPix = self.knotEnumeration[currPix]['next']
+            return currPix
+
+        # helper func to set the next crossing to be an existing crossing
+        def setNextCrossing(existingCrossNum):
+            self.ijkCrossings.append(ijkCrossings[existingCrossNum])
+            self.handedness.append(handedness[existingCrossNum])
+            print("now ijkCrossings are")
+            for c in self.ijkCrossings:
+                print(c)
+        
+        # travel around knot and record all crossings in order
+        # self.ijkCrossings = [None for _ in ijkCrossings] # sorted versions
+        # self.handedness = [None for _ in handedness]
+        self.ijkCrossings = [] # sorted versions
+        self.handedness = []
+        setNextCrossing(0) # arbitrary beginning
+        currCrossing = 0
+        while len(self.handedness) < len(handedness):
+            # get k of current crossing number
+            _, _, currentKEp = ijkPoints[currCrossing]
+            # get the crossing number of next crossing
+            print("starting at kEp: {}".format(currentKEp))
+            nextJ = skipToJ(currentKEp)
+            print("skipped to jEp: {}".format(nextJ))
+            nextCrossing = jEpToCrossingNum[nextJ]
+            print("that crossing is {}".format(nextCrossing))
+            # add that crossing as the next in line
+            setNextCrossing(nextCrossing)
+            # proceed
+            currCrossing = nextCrossing
+
+
 
     # returns a doubly linked list of the entire length of the knot
     def enumerateKnotLength(self):

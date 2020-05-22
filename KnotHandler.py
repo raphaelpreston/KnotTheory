@@ -145,18 +145,28 @@ class KnotHandler(): # TODO: delete self variables for certain steps once they'r
                 ijkCrossings = self.ah.ijkCrossings
                 handedness = self.ah.handedness
 
+                # error check
+                if any([h != "left" and h != "right" for h in handedness]):
+                    print("Error: Handedness had an unrecognized value")
+                    print(handedness)
+                    return
+
                 print("IJK Crossings:")
                 print(ijkCrossings)
 
                 print("Handedness")
                 print(handedness)
 
-                print(" ------------- Knot Calculations -------------")
+                print("------------- Alexander Polynomial -------------")
 
                 # perform alexander polynomial calculations
                 alexPoly = APolTools.compute(ijkCrossings, handedness)
                 print("Alex Polynomial:")
                 print(alexPoly)
+
+                print("-------------- HOMFLY Polynomial ---------------")
+
+
 
             else:
                 for pixel, endPoints in self.spineExtensionPixelsToArc.items():

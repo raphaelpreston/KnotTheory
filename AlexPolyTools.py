@@ -1,4 +1,4 @@
-from sympy import symbols, Matrix
+from sympy import symbols, Matrix, expand
 
 # printing method adapted from
 # https://stackoverflow.com/questions/13214809/pretty-print-2d-python-list
@@ -46,7 +46,7 @@ def compute(ijkCrossings, handedness):
     print("Alexander Matrix:")
     pm(matrix)
 
-    return matrix.det()
+    return expand(matrix.det())
 
 
 if __name__ == "__main__":
