@@ -142,7 +142,6 @@ class ArcHandler:
         jEpToCrossingNum = dict()
         kEpToCrossingNum = dict()
         for crossingNum in range(len(ijkPoints)): # for each crossing num
-            print("{}: {}".format(crossingNum, ijkPoints[crossingNum]))
             _, j, k = ijkCrossings[crossingNum]
             _, jEp, kEp = ijkPoints[crossingNum]
             jEpToCrossingNum[jEp] = crossingNum
@@ -150,14 +149,6 @@ class ArcHandler:
         if len(jEpToCrossingNum) != len(allJs):
             print("Error: Length of all Js differs from jEpToCrossingNum")
             return
-
-        print("Unsorted crossings:")
-        for crossing in ijkCrossings:
-            print(crossing)
-        print("Unsorted handedness: {}".format(handedness))
-        print("all js: {}".format(allJs))
-        print("js to crossings: {}".format(jEpToCrossingNum))
-        print("ks to crossings: {}".format(kEpToCrossingNum))
 
         # given a pixel, return closest pixel that is some crossing's 'j' pixel
         # in the "next" direction
@@ -171,13 +162,8 @@ class ArcHandler:
         def setNextCrossing(existingCrossNum):
             self.ijkCrossings.append(ijkCrossings[existingCrossNum])
             self.handedness.append(handedness[existingCrossNum])
-            print("now ijkCrossings are")
-            for c in self.ijkCrossings:
-                print(c)
         
         # travel around knot and record all crossings in order
-        # self.ijkCrossings = [None for _ in ijkCrossings] # sorted versions
-        # self.handedness = [None for _ in handedness]
         self.ijkCrossings = [] # sorted versions
         self.handedness = []
         setNextCrossing(0) # arbitrary beginning
@@ -186,11 +172,7 @@ class ArcHandler:
             # get k of current crossing number
             _, _, currentKEp = ijkPoints[currCrossing]
             # get the crossing number of next crossing
-            print("starting at kEp: {}".format(currentKEp))
-            nextJ = skipToJ(currentKEp)
-            print("skipped to jEp: {}".format(nextJ))
-            nextCrossing = jEpToCrossingNum[nextJ]
-            print("that crossing is {}".format(nextCrossing))
+            nextCrossing = jEpToCrossingNum[skipToJ(currentKEp)]
             # add that crossing as the next in line
             setNextCrossing(nextCrossing)
             # proceed
