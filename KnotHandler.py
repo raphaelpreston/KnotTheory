@@ -3,7 +3,8 @@ from random import randint, choice
 from math import sin, cos, radians, sqrt
 import DrawTools as dtools
 import ImageTools as itools
-from AlexPoly import AlexPoly
+import AlexPolyTools as APolTools
+
 from ArcHandler import *
 from PyQt5.QtGui import QPainter, QColor, QPen
 from PyQt5.QtCore import Qt, QTimer
@@ -127,7 +128,7 @@ class KnotHandler(): # TODO: delete self variables for certain steps once they'r
             self.spineExtensionPixelsToArc = dict() # extension pixel => set(endPoint, endPoint, ...)
         
         elif self.status == "spine-extension":
-            # test to see if all endPoints have intersected
+            # test to see if all endPoints have intersected; if so, we're done
             if self.ah.allEndpointsConnected():
                 for arcNum, data in enumerate(self.ah.crossings):
                     print("arc {} connections:".format(arcNum))
@@ -136,14 +137,27 @@ class KnotHandler(): # TODO: delete self variables for certain steps once they'r
                 self.status = "done"
                 print(self.status)
 
-                # enumerate entire knot
+                # enumerate entire knot, get ijkCrossings and handedness
                 self.ah.enumerateKnotLength()
-                self.knotEnumeration = self.ah.knotEnumeration
+                self.ah.getIJKCrossingsAndHandedness()
 
-                # perform calculations for what we want
-                self.alexPolyHandler = AlexPoly(self.ah)
-                # compute the various calculations
-                self.alexPolyHandler.compute()
+                self.knotEnumeration = self.ah.knotEnumeration
+                ijkCrossings = self.ah.ijkCrossings
+                handedness = self.ah.handedness
+
+                print("IJK Crossings:")
+                print(ijkCrossings)
+
+                print("Handedness")
+                print(handedness)
+
+                print(" ------------- Knot Calculations -------------")
+
+                # perform alexander polynomial calculations
+                alexPoly = APolTools.compute(ijkCrossings, handedness)
+                print("Alex Polynomial:")
+                print(alexPoly)
+
             else:
                 for pixel, endPoints in self.spineExtensionPixelsToArc.items():
                     endPoints = list(endPoints)
