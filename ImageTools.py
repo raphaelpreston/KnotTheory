@@ -1,7 +1,7 @@
 # slope functions adapted from
 # https://pythonprogramming.net/how-to-program-best-fit-line-machine-learning-tutorial/
 
-# sideOfPixel adapted from 
+# pixelOnSide adapted from 
 # https://math.stackexchange.com/questions/274712/calculate-on-which-side-of-a-straight-line-is-a-given-point-located
 
 from math import sin, cos, radians, degrees, sqrt, atan, isnan, isinf
@@ -270,7 +270,7 @@ def getRectangle(p1, p2, radius):
 
 # return "left" or "right" depending on which side of imaginary line between
 # p1 and p2 that pixel is on. returns None if it's on the line
-def sideOfPixel(p1, p2, pixel):
+def pixelOnSide(p1, p2, pixel):
     x, y = pixel
     x1, y1 = p1
     x2, y2 = p2

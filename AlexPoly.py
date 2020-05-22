@@ -22,52 +22,104 @@ class AlexPoly:
         self.handedness = None # crossingNumber => "RH" or "LH"
         self.poly = None
 
-        # todo: maybe smart to get the endpoitns for all i,j,k and store them for future use?
+        # todo: maybe smart to get the endpoints for all i,j,k and store them for future use?
 
 
-    def getIJKCrossings(self):
+    def getIJKCrossingsAndHandedness(self):
         # crossings are stored as arcNum => {endPoint => endPoint (of other arc)}
-        ijkTuples = [] # tuples of (i,j,k) to easily ensure uniqueness
+        ijkTuples = [] # tuples of (i,j,k)
+        self.handedness = [] # "left" or "right"
+        crossingsSeen = set()
         # for each arcNum
         for myArcNum, data in enumerate(self.ah.crossings):
             # for each arc it connects to
             for myEp, otherEp in data.items():
+
+                # skip if we've seen it before
+                if (myEp, otherEp) in crossingsSeen or \
+                        (otherEp, myEp) in crossingsSeen:
+                    continue
+
+                crossingsSeen.add((myEp, otherEp))
                 otherArcNum = self.ah.getPixelArc(otherEp)
 
                 # figure out which arc is between the endpoints
-                # use rectangle because lines might cross perfectly diagonally
+                # use rectangle because lines might cross without intersecting
+                # diagonally
                 pixelsBetween = it.getRectangle(myEp, otherEp, 2)
-                arcsBetween = set()
+                spinesBetween = set()
+                pixsOnI = set() # keep track of pixels on i's spine btwn j & k
                 for pix in pixelsBetween:
                     if self.ah.pixelHasSpine(pix):
                         spineNum = self.ah.getPixelSpine(pix)
                         if spineNum != myArcNum and spineNum != otherArcNum:
-                            arcsBetween.add(spineNum)
-                if len(arcsBetween) != 1:
+                            spinesBetween.add(spineNum)
+                            pixsOnI.add(pix)
+                if len(spinesBetween) != 1:
                     print("Error: There were more or less than 1 arc between {} and {}".format(myEp, otherEp))
-                    print("Arcs: {}".format(arcsBetween))
+                    print("Arcs: {}".format(spinesBetween))
                     print("Pixels between: {}".format(pixelsBetween))
                     return
-                arcsBetween = list(arcsBetween)
+                spinesBetween = list(spinesBetween)
                 
-                # enumerate i, j, and k
-                # crossing numbers assigned arbitrarily
+                # enumerate i, j, and k; crossing numbers assigned arbitrarily
                 myEpNext = self.ah.knotEnumeration[myEp]["next"]
                 myEpPrev = self.ah.knotEnumeration[myEp]["prev"]
-                i = arcsBetween[0]
+                i = spinesBetween[0]
                 if otherEp == myEpNext: # goes from myEp to otherEp
                     j, k = myArcNum, otherArcNum
+                    jEp, kEp = myEp, otherEp
                 elif otherEp == myEpPrev: # goes from otherEp to myEp
                     k, j = myArcNum, otherArcNum
+                    kEp, jEp = myEp, otherEp
                 else:
                     print("Error: Supposed EP connection wasn't in any neighbors")
                     return
-                # print("Arc {} i,j,k connections:".format(myArcNum))
-                # print("  i: {}\n  j: {}\n  k: {}".format(i, j, k))
+                
+                # record the i,j,k values
+                ijkTuples.append((i, j, k)) 
+                
+                # figure out handedness
+                # form imaginary line on i around the pixels on i between j & k
+                iPoint = pixsOnI.pop() # arbitrary
 
-                # add to set
-                if (i, j, k) not in ijkTuples:
-                    ijkTuples.append((i, j, k))
+                # traverse both ways down i to form imaginary line
+                nextN = self.ah.knotEnumeration[iPoint]["next"]
+                prevN = self.ah.knotEnumeration[iPoint]["prev"]
+                posLine = [iPoint, nextN]
+                negLine = [prevN]
+                currPixs = [nextN, prevN]
+                done = False
+                while not done:
+                    nextsUp = []
+                    # for each pixel
+                    for currPix in currPixs:
+                        # get the neighbor in its appropriate direction
+                        myDir = "next" if currPix in posLine else "prev"
+                        nextN = self.ah.knotEnumeration[currPix][myDir]
+                        # add it to the appropriate directional line
+                        if myDir == "next":
+                            posLine.append(nextN)
+                        else:
+                            negLine.append(nextN)
+                        # check if we've added enough pixels to the line
+                        if len(posLine) + len(negLine) == I_LINE_LEN:
+                            done = True
+                            break
+                        nextsUp.append(nextN)
+                    currPixs = nextsUp
+                
+                # line will become last point of neg dir to last of pos
+                p1 = negLine[-1]
+                p2 = posLine[-1]
+
+                # determine on which side of the line on i lies j
+                pixelOnSide = it.pixelOnSide(p1, p2, jEp)
+                if pixelOnSide == None:
+                    print("Error: pixel {} is on the line".format(jEp))
+                    return
+                # appending to self.handedness does preserve order
+                self.handedness.append(pixelOnSide)
         # convert into ijkCrossings
         self.ijkCrossings = []
         for i, j, k in ijkTuples:
@@ -154,12 +206,12 @@ class AlexPoly:
             p2 = posLine[-1]
 
             # print("Calling sideOfPixel({}, {}, {})".format(p1, p2, jEp))
-            sideOfPixel = it.sideOfPixel(p1, p2, jEp)
-            if sideOfPixel == None:
+            pixelOnSide = it.pixelOnSide(p1, p2, jEp)
+            if pixelOnSide == None:
                 print("Error: pixel {} is on the line".format(jEp))
                 return
             # print("got {}".format(sideOfPixel))
-            self.handedness[crossingNum] = sideOfPixel
+            self.handedness[crossingNum] = pixelOnSide
 
     def getMatrix(self):
         # initialize matrix
@@ -201,10 +253,10 @@ class AlexPoly:
 
     def compute(self):
         # get the i,j,k values and RH/LH data for all crossings
-        self.getIJKCrossings()
+        self.getIJKCrossingsAndHandedness()
         print("IJK Crossings:")
         print(self.ijkCrossings)
-        self.getHandedness()
+        # self.getHandedness()
         print("Handedness")
         print(self.handedness)
         self.getMatrix()
