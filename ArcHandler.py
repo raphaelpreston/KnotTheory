@@ -136,7 +136,6 @@ class ArcHandler:
 
 
         allCrossingPoints = set([p for points in ijkPoints for p in points])
-
         # return three dictionaries that map i, j, and k points
         # to their crossing numbers. accepts an ijkpoints dict
         def getIJKDicts(myIJKCrossings, myIJKPoints):
@@ -169,7 +168,6 @@ class ArcHandler:
         def nextCyclicalCrossing(crossingNum):
             # get k of current crossing number
             _, _, currentKEp = ijkPoints[crossingNum]
-            print("Current k: {}".format(currentKEp))
 
             # find the next "j" pixel
             currPix = self.knotEnumeration[currentKEp]['next']
@@ -177,16 +175,7 @@ class ArcHandler:
                 currPix = self.knotEnumeration[currPix]['next']
             
             # get the crossing number for that 'j' pixel
-            print("skipping to {}".format(jEpToCrossingNum[currPix]))
             return jEpToCrossingNum[currPix]
-
-        print("IJK Crossings:")
-        for crossing in ijkCrossings:
-            print(crossing)
-        
-        print("IJK Points:")
-        for points in ijkPoints:
-            print(points)
         
         # travel around knot and record all crossings in order
         self.ijkCrossings = [] # sorted versions
@@ -194,17 +183,12 @@ class ArcHandler:
         self.ijkPoints = []
         currCrossing = 0 # arbitrary beginning
         while len(self.handedness) < len(handedness):
-            print("Analyzing crossing {}".format(currCrossing))
              # add this crossing as the next in line in the sorted versions
             self.ijkCrossings.append(ijkCrossings[currCrossing])
             self.handedness.append(handedness[currCrossing])
             self.ijkPoints.append(ijkPoints[currCrossing])
             # proceed
             currCrossing = nextCyclicalCrossing(currCrossing)
-        
-        print("SORTED IJK Points:")
-        for points in self.ijkPoints:
-            print(points)
         
         # now that everything's sorted, we can get neighbors from each crossing
         # for simplicity, record all crossing points,
@@ -216,7 +200,6 @@ class ArcHandler:
         # given a crossing index, return the neighbor crossing in a direction
         # from the given arcType of the crossing, requires sorted self.ijkPoints
         def getCrossingNInDir(crossingIndex, arcType, myDir):
-            print("Finding {} of {} for {}".format(myDir, arcType, crossingIndex))
             # get our starting pixel
             iPoint, jEp, kEp = self.ijkPoints[crossingIndex]
             if arcType == 'i':
@@ -226,21 +209,11 @@ class ArcHandler:
             elif arcType == 'k':
                 sourcePix = kEp
             
-            print("Sarting pixel: {}".format(sourcePix))
-            
             # travel forward and hit another crossing
             currPix = self.knotEnumeration[sourcePix][myDir]
             while currPix not in allCrossingPoints:
                 currPix = self.knotEnumeration[currPix][myDir]
             # currPix is not some i, j, k pixel of another crossing
-            print("jumped to {}".format(currPix))
-            if currPix in jEpToCrossingNum:
-                print("That's in jEps")
-            if currPix in kEpToCrossingNum:
-                print("That's in kEps")
-            if currPix in iPointToCrossingNum:
-                print("That's in iPoints")
-
             if currPix in jEpToCrossingNum:
                 return jEpToCrossingNum[currPix]
             elif currPix in kEpToCrossingNum:
@@ -261,10 +234,6 @@ class ArcHandler:
                 'j': getCrossingNInDir(currCrossing, 'j', 'prev'),
                 'k': getCrossingNInDir(currCrossing, 'k', 'next')
             }
-            print("CrossingNs for currCrossing = {}".format(currCrossing))
-            for l, nData in crossingNs.items():
-                print(" {}: {}".format(l, nData))
-
             self.ijkCrossingNs[currCrossing] = crossingNs
 
 
