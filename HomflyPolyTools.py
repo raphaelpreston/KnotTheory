@@ -42,27 +42,45 @@ def getOtherCrossing(index, ijkCrossings, arcType):
     return otherCrossing[0], crossingsAsI
 
 # swap a given crossing in-place
-def swapCrossing(crossingIndex, ijkCrossings, handedness):
+def swapCrossing(crossingIndex, ijkCrossings, ijkCrossingNs, handedness):
     i = ijkCrossings[crossingIndex]['i']
     j = ijkCrossings[crossingIndex]['j']
     k = ijkCrossings[crossingIndex]['k']
+    crossingNs = ijkCrossingNs[crossingIndex]
     right = handedness == "right"
 
-    # get i's two crossings in order and j's & k's other crossing
+    # get the endpoints of the i arc, and the other points on j and ks arcs
     iCross1, iCross2, iCrossingsAsI = getOrderedICrossings(crossingIndex, ijkCrossings)
     jCrossOther, jCrossingsAsI = getOtherCrossing(crossingIndex, ijkCrossings, 'j')
     kCrossOther, kCrossingsAsI = getOtherCrossing(crossingIndex, ijkCrossings, 'k')
+
     
     # i's end is i's arcNum, i's second crossing remains constant
     newK = i
 
-    # i's start steals k's arcNum, update i's first crossing's k to i_start too
+    # all crossings on the second half of i where i is the i for that crossing
+    # stay constant
+
+    # the new arc formed in the first half of i steals k's arcNum because j's
+    # arcnum will extend into k and become i
     newJ = k
     ijkCrossings[iCross1]['k'] = newJ
 
+    # all crossings between this crossing and the crossing on the prev of old i
+    # in the i direction
+    # that have old i as an i for them too need to be updated to reflect that 
+    # their new i should be k
+
     # j's arcNum extends into k
-    newIEnd = j
-    ijkCrossings[kCrossOther]['j'] = j
+    newI = j
+
+    ijkCrossings[jCrossOther]['k'] = newI
+    # all crossings between this and jOther in the j direction where oldj is the
+    # i in that crossing need to be updated so that their i is newI
+
+    ijkCrossings[kCrossOther]['j'] = newI
+    # all crossings between this and kOther in the k direction where oldk is the
+    # i in that crossing need to be updated so that their i is newI
 
     # switch the handedness
     handedness[crossingIndex] = "left" if right else "right"
@@ -78,7 +96,7 @@ def diagramIsUnLink(ijkCrossings, handedness):
     pass
 
 
-def compute(ijkCrossings, handedness):
+def compute(ijkCrossings, ijkCrossingNs, handedness):
     pass
 
 
@@ -89,6 +107,12 @@ ijkCrossings = [
     {'i': 0, 'j': 1, 'k': 2},
     {'i': 1, 'j': 2, 'k': 3}
 ]
+ijkCrossingNs = [
+    {'i': {'next': 3, 'prev': 2}, 'j': 1, 'k': 2},
+    {'i': {'next': 0, 'prev': 3}, 'j': 2, 'k': 3},
+    {'i': {'next': 1, 'prev': 0}, 'j': 3, 'k': 0},
+    {'i': {'next': 2, 'prev': 1}, 'j': 0, 'k': 1}
+]
 handedness = ['left', 'right', 'left', 'right']
 
 print("preswap: ")
@@ -96,7 +120,7 @@ for c in ijkCrossings:
     print("  {}".format(c))
 
 # test swap crossings
-swapCrossing(0, ijkCrossings, handedness)
+swapCrossing(0, ijkCrossings, ijkCrossingNs, handedness)
 
 print("After swapping crossing 0: ")
 for c in ijkCrossings:
