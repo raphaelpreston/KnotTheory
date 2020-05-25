@@ -27,13 +27,10 @@ def getOtherCrossing(index, ijkCrossings, arcType):
     otherCrossing = [
         ind for ind, crossings in enumerate(ijkCrossings) if crossings[lookingForType] == myArc
     ]
-    crossingsAsI = [
-        ind for ind, crossings in enumerate(ijkCrossings) if crossings['i'] == myArc
-    ]
     if len(otherCrossing) > 1:
         print("Error: Found more than one crossing for {}".format(arcType))
         return
-    return otherCrossing[0], crossingsAsI
+    return otherCrossing[0]
 
 
 def checkArcType(arcType):
@@ -47,29 +44,6 @@ def getCrossingArcType(crossingInd, arcNum, ijkCrossings):
         if arcNum == otherArcNum:
             return arcType
     return None
-
-# returns the arcType in which to depart the crossingN in order to continue
-# in the same direction from crossingInd -> crossingN onwards
-def getContinuousDir(crossingInd, crossingN, ijkCrossings, ijkCrossingNs):
-    # get the arcNum that both crossings share
-    sharedArcNum = [
-        a for a in ijkCrossings[crossingInd].values() if a in ijkCrossings[crossingN].values()
-    ][0]
-
-    print("The shared arcNum between {} and {} is {}".format(crossingInd, crossingN, sharedArcNum))
-
-    # figure incoming direction into crossingN
-    incomingDir = getCrossingArcType(crossingN, sharedArcNum, ijkCrossings)
-    print("calculated again incoming direction into {}, which is {}".format(crossingN, incomingDir))
-
-    # figure out in which direction to continue
-    if incomingDir == 'i': # not clear if i0 or i1, gotta just manually check
-        if ijkCrossingNs[crossingN]['i0'] == crossingInd:
-            return 'i1' # cus choosing i0 results in going back to first crossing
-        elif ijkCrossingNs[crossingN]['i1'] == crossingInd:
-            return 'i0'
-    else:
-        return {'j': 'k', 'k': 'j'}[incomingDir]
 
 # returns the incoming direction from c1 into c2 given outgoing dir from c1
 # you need an outgoing dir because it's possible that crossings are connected
@@ -99,19 +73,14 @@ def getCrossingsBetween(crossingInd1, crossingInd2, inDir, ijkCrossings, ijkCros
     # keep going until we hit our destination crossing
     currCrossing = crossingInd1
     currDir = inDir # i0, i1, j, or k
-    print("Starting at {} with dir {}".format(currCrossing, currDir))
     while currCrossing != crossingInd2:
-        print("examining crossing {} by looking in dir {}".format(currCrossing, currDir))
 
         # get the next crossing in direction
         nextCrossing = ijkCrossingNs[currCrossing][currDir]
-        crossingsFound.append(nextCrossing)
-        print("recorded neighbor {}".format(nextCrossing))
 
         # get the incoming direction into the neighbor crossing
         incomingDir = getIncomingDir(currCrossing, currDir, nextCrossing, ijkCrossings, ijkCrossingNs)
         
-
         # figure out in which direction to continue searching
         if incomingDir == 'i': # not clear if i0 or i1, gotta just manually check
             if ijkCrossingNs[nextCrossing]['i0'] == currCrossing:
@@ -121,7 +90,8 @@ def getCrossingsBetween(crossingInd1, crossingInd2, inDir, ijkCrossings, ijkCros
         else:
             nextDir = {'j': 'k', 'k': 'j'}[incomingDir]
         
-        print("continuing in dir {}".format(nextDir))
+        # record findings and proceed
+        crossingsFound.append(nextCrossing)
         currCrossing, currDir = nextCrossing, nextDir
     
     # get rid of our destination crossing
@@ -134,43 +104,70 @@ def swapCrossing(crossingIndex, ijkCrossings, ijkCrossingNs, handedness):
     i = ijkCrossings[crossingIndex]['i']
     j = ijkCrossings[crossingIndex]['j']
     k = ijkCrossings[crossingIndex]['k']
-    right = handedness == "right"
 
     # get the endpoints of the i arc, and the other points on j and ks arcs
-    iCross1, iCross2, iCrossingsAsI = getOrderedICrossings(crossingIndex, ijkCrossings)
-    jCrossOther, jCrossingsAsI = getOtherCrossing(crossingIndex, ijkCrossings, 'j')
-    kCrossOther, kCrossingsAsI = getOtherCrossing(crossingIndex, ijkCrossings, 'k')
+    iCross0, iCross1 = getOrderedICrossings(crossingIndex, ijkCrossings)
+    jCrossOther = getOtherCrossing(crossingIndex, ijkCrossings, 'j')
+    kCrossOther = getOtherCrossing(crossingIndex, ijkCrossings, 'k')
+
+
+    # get the crossings over which the i, j, or k arcs pass through (as i), but
+    # don't need to know the crossings between i and iCross1
+    # the crossings between inherently are crossings where the arc is i
+    i0CrossingsAsI = [
+        c for c in getCrossingsBetween(crossingIndex, iCross0, 'i0', ijkCrossings, ijkCrossingNs)
+    ]
+    jCrossingsAsI =  [
+        c for c in getCrossingsBetween(crossingIndex, jCrossOther, 'j', ijkCrossings, ijkCrossingNs)
+    ]
+    kCrossingsAsI =  [
+        c for c in getCrossingsBetween(crossingIndex, kCrossOther, 'k', ijkCrossings, ijkCrossingNs)
+    ]
+
+    print("i0CrossingsAsI: {}".format(i0CrossingsAsI))
+    print("jCrossingsAsI: {}".format(jCrossingsAsI))
+    print("kCrossingsAsI: {}".format(kCrossingsAsI))
 
     
-    # i's end is i's arcNum, i's second crossing remains constant
+    # from crossing -> iCross1 stays i's old arcNum, but it's the new k
     newK = i
+    # all crossings between crossing -> iCross1 stay constant
 
-    # all crossings on the second half of i where i is the i for that crossing
-    # stay constant
-
-    # the new arc formed in the first half of i steals k's arcNum because j's
-    # arcnum will extend into k and become i
+    # the new arc formed from iCross0 to crossing steals k's arcNum since
+    # k's arcNum will be engulfed by j
     newJ = k
-    ijkCrossings[iCross1]['k'] = newJ
 
-    # all crossings between this crossing and the crossing on the prev of old i
-    # in the i direction
-    # that have old i as an i for them too need to be updated to reflect that 
-    # their new i should be k
+    # update all crossings inbetween crossing and iCross0
+    for c in i0CrossingsAsI:
+        ijkCrossings[c]['i'] = k
+    
+    # change the value at iCross0 too
+    ijkCrossings[iCross0]['k'] = k
 
-    # j's arcNum extends into k
+    # j's arcNum extends into k to become the new i
     newI = j
 
-    ijkCrossings[jCrossOther]['k'] = newI
-    # all crossings between this and jOther in the j direction where oldj is the
-    # i in that crossing need to be updated so that their i is newI
+    # update crossings between crossing and other tip of k
+    for c in kCrossingsAsI:
+        ijkCrossings[c]['i'] = j
 
-    ijkCrossings[kCrossOther]['j'] = newI
-    # all crossings between this and kOther in the k direction where oldk is the
-    # i in that crossing need to be updated so that their i is newI
+    # update the value at tip of k
+    ijkCrossings[kCrossOther]['j'] = j
 
-    # switch the handedness
-    handedness[crossingIndex] = "left" if right else "right"
+    # the i's on crossings between crossing and other tip of j stay constant
+    # as well as the tip of j
+
+    # swap the neighbors
+    myNs = ijkCrossingNs[crossingIndex]
+    myNs['i0'], myNs['i1'], myNs['j'], myNs['k'] = (
+        myNs['j'], myNs['k'], myNs['i0'], myNs['i1']
+    )
+
+    # replace our crossing with the new values
+    ijkCrossings[crossingIndex] = {'i': newI, 'j': newJ, 'k': newK}
+
+    # # switch the handedness
+    handedness[crossingIndex] = "left" if handedness == "right" else "right"
 
 
 # smooth a given crossing in-place
@@ -202,19 +199,28 @@ ijkCrossingNs = [
 ]
 handedness = ['left', 'right', 'left', 'right']
 
-# print("preswap: ")
-# for c in ijkCrossings:
-#     print("  {}".format(c))
+print("preswap: ")
+print("crossings:")
+for i, c in enumerate(ijkCrossings):
+    print("  {}: {}".format(i, c))
+print("neighbors: ")
+for i, c in enumerate(ijkCrossingNs):
+    print("  {}: {}".format(i, c))
 
-# # test swap crossings
-# swapCrossing(0, ijkCrossings, ijkCrossingNs, handedness)
+# test swap crossings
+print()
+swapCrossing(0, ijkCrossings, ijkCrossingNs, handedness)
+print()
 
-# print("After swapping crossing 0: ")
-# for c in ijkCrossings:
-#     print("  {}".format(c))
-# print(handedness)
+print("After swapping")
+print("crossings:")
+for i, c in enumerate(ijkCrossings):
+    print("  {}: {}".format(i, c))
+print("neighbors: ")
+for i, c in enumerate(ijkCrossingNs):
+    print("  {}: {}".format(i, c))
 
-print(getCrossingsBetween(0, 3, 'j', ijkCrossings, ijkCrossingNs))
+# print(getCrossingsBetween(2, 0, 'i1', ijkCrossings, ijkCrossingNs))
 
 # this is skipping 1 for some reason
 
