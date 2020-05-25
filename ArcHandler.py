@@ -227,10 +227,9 @@ class ArcHandler:
         for currCrossing in range(len(self.handedness)):
             # get immediate neighbors from all i, j, k in both directions
             crossingNs = {
-                'i': { # both next and prev for i
-                    myDir: getCrossingNInDir(currCrossing, 'i', myDir)
-                        for myDir in ["next", "prev"]
-                },
+                # both next and prev for i
+                'i0': getCrossingNInDir(currCrossing, 'i', 'prev'),
+                'i1': getCrossingNInDir(currCrossing, 'i', 'next'),
                 'j': getCrossingNInDir(currCrossing, 'j', 'prev'),
                 'k': getCrossingNInDir(currCrossing, 'k', 'next')
             }
