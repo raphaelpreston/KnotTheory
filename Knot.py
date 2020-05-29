@@ -5,6 +5,7 @@ class Knot:
         self.ijkCrossings = ijkCrossings
         self.ijkCrossingNs = ijkCrossingNs
         self.handedness = handedness
+        self.numUnknots = 0
     
     # return true if myDir is a valid direction
     def checkArcType(self, myDir):
@@ -182,7 +183,7 @@ class Knot:
         self.handedness[crossingIndex] = "left" if self.handedness == "right" else "right"
 
 
-    # smooth a given crossing in-place
+    # smooth a given crossing in-place, could increase self.numUnknots
     def smoothCrossing(self, c):
         i = self.ijkCrossings[c]['i']
         j = self.ijkCrossings[c]['j']
@@ -230,26 +231,95 @@ class Knot:
         self.ijkCrossingNs[i0N][i0NOutDir] = kN
         self.ijkCrossingNs[kN][kNInDir] = i0N
 
+        # determine if we've just made an uknot
+        print("Before deleting:")
+
 
         # remove crossing from ijkCrossings, and handedness
         self.ijkCrossings[c] = None
         self.ijkCrossingNs[c] = None
         self.handedness[c] = None
 
+    # return an R1 crossing or None if none exist
+    def getR1Crossing(self):
+
+        def getNextDir(incomingDir, currCrossing, nextCrossing):
+            if incomingDir == 'i': # not clear if i0 or i1
+                if self.ijkCrossingNs[nextCrossing]['i0'] == currCrossing:
+                    return 'i1' # cus choosing i0 results in going back
+                elif self.ijkCrossingNs[nextCrossing]['i1'] == currCrossing:
+                    return 'i0'
+            else:
+                return {'j': 'k', 'k': 'j'}[incomingDir]
+
+        # choose starting crossing. determine if there is at least one crossing.
+        source = None
+        for i in range(self.ijkCrossings):
+            if self.ijkCrossings[i] is not None:
+                source = i
+                break
+        if source is None: # return None if no crossings exist
+            return None
+        
+        # have to loop around in both directions to find all potential R1s
+        for inDir in ['i1', 'i0']:
+            # keep track of crossings between each crossing and itself in a list in
+            # form crossingNum => (otherCrossing, "over" or "under"). crossingNum
+            # crosses ____ otherCrossing
+            csBetweenSelf = [[] for _ in self.ijkCrossings]
+            csInQ = set() # cs that we've run across and haven't run into again
+
+            # keep going until we hit source again
+            currDir = inDir # i0, i1, j, or k
+            while True: # want to jump at least once
+
+                # get the next crossing in direction
+                nextCrossing = self.ijkCrossingNs[currCrossing][currDir]
+
+                # get the incoming direction into the neighbor crossing
+                incomingDir = self.getIncomingDir(currCrossing, currDir,
+                    nextCrossing)
+                
+                # figure out in which direction to continue searching
+                nextDir = getNextDir(incomingDir, currCrossing, nextCrossing)
+                
+                # determine if we've hit any crossing again
+                if nextCrossing in csInQ:
+                    pass
+                else:
+                    csInQ.add(nextCrossing)
+                
+                
+                crossingsFound.append(nextCrossing)
+                currCrossing, currDir = nextCrossing, nextDir
+
+                # break if necessary
+                if currCrossing == c2:
+                    break
+        
+        # get rid of our destination crossing
+        crossingsFound.pop()
+        return crossingsFound
+        
+
+
+
+
     # repeatedly reduces all R1 crossings until there are none left
     def reduceR1s(self):
         # a crossing is R1 iff i = j or i = k
         # a crossing is R1 iff i1N = jN = c or i0N = kN = c
 
-        # identify all crossings and the direction of the curve (i0 or i1)
-
+        # identify an R1 crossing and remove it via an R1 move
         for c in len(self.ijkCrossings):
             if self.ijkCrossings[c] is not None:
                 i0N = self.ijkCrossingNs['i0']
                 i1N = self.ijkCrossingNs['i1']
                 jN = self.ijkCrossingNs['j']
                 kN = self.ijkCrossingNs['k']
-                if i1N == jN == c: # R1 crossing in i1 direction # TODO: THIS DOESN'T GUARANTEE R1 CROSSING
+
+                if i1N == jN == c: # loops back onto itself
+
                     csBetweenSelf = self.getCrossingsBetween(c, c, 'i1')
                     csBetweenNext = self.getCrossingsBetween(c, kN, 'k')
 
@@ -257,7 +327,9 @@ class Knot:
                     pass
                 
                 for cBetweenSelf in csBetweenSelf:
+                    pass
                     # remove i from crossing <- TODO: make a function for this
+
 
     # TODO: working here: skip R1 reductions and move onto HOMFLY
     # TODO: then after we can do R1 and R2 reductions
@@ -268,6 +340,8 @@ class Knot:
     # TODO: can make propogateChange function that will propogate an arc change to the end of an arc
 
 if __name__ == "__main__":
+
+
     # figure 8 knot for testing
     ijkCrossings = [
         {'i': 2, 'j': 3, 'k': 0},
@@ -285,29 +359,31 @@ if __name__ == "__main__":
 
     myKnot = Knot(ijkCrossings, ijkCrossingNs, handedness)
 
+    def printStuff():
+        print("crossings:")
+        for i, c in enumerate(myKnot.ijkCrossings):
+            print("  {}: {}".format(i, c))
+        print("neighbors: ")
+        for i, c in enumerate(myKnot.ijkCrossingNs):
+            print("  {}: {}".format(i, c))
+        print(handedness)
+
     print("preswap: ")
-    print("crossings:")
-    for i, c in enumerate(myKnot.ijkCrossings):
-        print("  {}: {}".format(i, c))
-    print("neighbors: ")
-    for i, c in enumerate(myKnot.ijkCrossingNs):
-        print("  {}: {}".format(i, c))
-    print(handedness)
+    printStuff()
 
     # test swap crossings
-    print()
     swap = 0
-    myKnot.smoothCrossing(swap)
-    print()
+    myKnot.swapCrossing(swap)
 
-    print("After swapping {}".format(swap))
-    print("crossings:")
-    for i, c in enumerate(myKnot.ijkCrossings):
-        print("  {}: {}".format(i, c))
-    print("neighbors: ")
-    for i, c in enumerate(myKnot.ijkCrossingNs):
-        print("  {}: {}".format(i, c))
-    print(handedness)
+    print("\nAfter swapping {}".format(swap))
+    printStuff()
+
+    # test smooth crossings
+    smooth = 1
+    myKnot.smoothCrossing(smooth)
+
+    print("\nAfter smoothing {}".format(smooth))
+    printStuff()
 
 # TODO:
 # - undo all trivial R1 moves to cut down on necessary recursive steps also cus ez
@@ -318,3 +394,5 @@ if __name__ == "__main__":
 #   start frontend work
 # - write algo-style proofs for swapping and smoothing
 # - it's possible to undo R2 moves using neighbor checking
+# - create an iterator or just a function that returns a path looping around the knot
+#  - can be used in getCrossingsBetween and also figuring out if an R1 crossing
