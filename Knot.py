@@ -92,12 +92,15 @@ class Knot:
             incomingDir = self.getIncomingDir(currCrossing, currDir,
                 nextCrossing)
             
+            
             # figure out in which direction to continue searching
             if incomingDir == 'i': # not clear if i0 or i1
                 if self.ijkCrossingNs[nextCrossing]['i0'] == currCrossing:
                     nextDir = 'i1' # cus choosing i0 results in going back
                 elif self.ijkCrossingNs[nextCrossing]['i1'] == currCrossing:
                     nextDir = 'i0'
+                else:
+                    print("here")
             else:
                 nextDir = {'j': 'k', 'k': 'j'}[incomingDir]
             
@@ -116,7 +119,7 @@ class Knot:
         j = self.ijkCrossings[crossingIndex]['j']
         k = self.ijkCrossings[crossingIndex]['k']
 
-        # get the endpoints of the i arc, and the other points on j and ks arcs
+        # get the crossings of the i arc, and the other points on j and ks arcs
         iCross0, _ = self.getOrderedICrossings(crossingIndex)
         kCrossOther = self.getOtherJKCrossing(crossingIndex, 'k')
 
@@ -173,12 +176,103 @@ class Knot:
         self.handedness[crossingIndex] = "left" if self.handedness == "right" else "right"
 
 
-    # smooth a given crossing in-place
+    # smooth a given crossing in-place. this might require that all trivial
+    # R1 moves are performed
     def smoothCrossing(self, c):
-        pass
+        i = self.ijkCrossings[c]['i']
+        j = self.ijkCrossings[c]['j']
+        k = self.ijkCrossings[c]['k']
+
+        # get the crossings of the i arc, and the other points on j and ks arcs
+        iCross0, iCross1 = self.getOrderedICrossings(c)
+        jCrossOther = self.getOtherJKCrossing(c, 'j')
+        kCrossOther = self.getOtherJKCrossing(c, 'k')
+
+        # k arc becomes i
+        # update the crossings on k
+        for cBetween in self.getCrossingsBetween(c, kCrossOther, 'k'):
+            self.ijkCrossings[cBetween]['i'] = i
+        
+        # update the other end of k
+        self.ijkCrossings[kCrossOther]['j'] = i
+
+
+        # i1 arc becomes j
+        # update the crossings on i1
+        for cBetween in self.getCrossingsBetween(c, iCross1, 'i1'):
+            self.ijkCrossings[cBetween]['i'] = j
+
+        # update the other end of i1
+        self.ijkCrossings[iCross1]['j'] = j
+
+
+        # update neighbors of all neighbors
+        jN = self.ijkCrossingNs[c]['j']
+        i1N = self.ijkCrossingNs[c]['i1']
+        i0N = self.ijkCrossingNs[c]['i0']
+        kN = self.ijkCrossingNs[c]['k']
+
+        # connect neighbors between jN -> i1 curve. need to know if nearest
+        # neighbor is the end of the arc to determine direction types
+        jNOutDir = 'k' if jCrossOther == jN else 'i1'
+        i1NInDir = 'j' if iCross1 == i1N else 'i0'
+        self.ijkCrossingNs[jN][jNOutDir] = i1N
+        self.ijkCrossingNs[i1N][i1NInDir] = jN
+
+        # connect neighbors between i0 -> k curve
+        i0NOutDir = 'k' if iCross0 == i0N else 'i1'
+        kNInDir = 'j' if kCrossOther == kN else 'i0'
+        self.ijkCrossingNs[i0N][i0NOutDir] = kN
+        self.ijkCrossingNs[kN][kNInDir] = i0N
+
+
+        # remove crossing from ijkCrossings, and handedness
+        self.ijkCrossings[c] = None
+        self.ijkCrossingNs[c] = None
+        self.handedness[c] = None
+
 
 if __name__ == "__main__":
-    import HomflyPolyTools
+    # figure 8 knot for testing
+    ijkCrossings = [
+        {'i': 2, 'j': 3, 'k': 0},
+        {'i': 3, 'j': 0, 'k': 1},
+        {'i': 0, 'j': 1, 'k': 2},
+        {'i': 1, 'j': 2, 'k': 3}
+    ]
+    ijkCrossingNs = [
+        {'i0': 2, 'i1': 3, 'j': 1, 'k': 2},
+        {'i0': 3, 'i1': 0, 'j': 2, 'k': 3},
+        {'i0': 0, 'i1': 1, 'j': 3, 'k': 0},
+        {'i0': 1, 'i1': 2, 'j': 0, 'k': 1}
+    ]
+    handedness = ['left', 'right', 'left', 'right']
+
+    myKnot = Knot(ijkCrossings, ijkCrossingNs, handedness)
+
+    print("preswap: ")
+    print("crossings:")
+    for i, c in enumerate(myKnot.ijkCrossings):
+        print("  {}: {}".format(i, c))
+    print("neighbors: ")
+    for i, c in enumerate(myKnot.ijkCrossingNs):
+        print("  {}: {}".format(i, c))
+    print(handedness)
+
+    # test swap crossings
+    print()
+    swap = 0
+    myKnot.smoothCrossing(swap)
+    print()
+
+    print("After swapping {}".format(swap))
+    print("crossings:")
+    for i, c in enumerate(myKnot.ijkCrossings):
+        print("  {}: {}".format(i, c))
+    print("neighbors: ")
+    for i, c in enumerate(myKnot.ijkCrossingNs):
+        print("  {}: {}".format(i, c))
+    print(handedness)
 
 # TODO:
 # - undo all trivial R1 moves to cut down on necessary recursive steps also cus ez
