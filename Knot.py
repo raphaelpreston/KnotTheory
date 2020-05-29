@@ -77,13 +77,24 @@ class Knot:
     # return the crossings between crossing1 -> crossing2 in the inDir (i0/1,
     # j, or k) direction
     def getCrossingsBetween(self, c1, c2, inDir):
+
+        def getNextDir(incomingDir, currCrossing, nextCrossing):
+            if incomingDir == 'i': # not clear if i0 or i1
+                if self.ijkCrossingNs[nextCrossing]['i0'] == currCrossing:
+                    return 'i1' # cus choosing i0 results in going back
+                elif self.ijkCrossingNs[nextCrossing]['i1'] == currCrossing:
+                    return 'i0'
+            else:
+                return {'j': 'k', 'k': 'j'}[incomingDir]
+
+
         # keep track of crossings inbetween
         crossingsFound = []
 
         # keep going until we hit our destination crossing
         currCrossing = c1
         currDir = inDir # i0, i1, j, or k
-        while currCrossing != c2:
+        while True: # want to go at least once
 
             # get the next crossing in direction
             nextCrossing = self.ijkCrossingNs[currCrossing][currDir]
@@ -92,21 +103,16 @@ class Knot:
             incomingDir = self.getIncomingDir(currCrossing, currDir,
                 nextCrossing)
             
-            
             # figure out in which direction to continue searching
-            if incomingDir == 'i': # not clear if i0 or i1
-                if self.ijkCrossingNs[nextCrossing]['i0'] == currCrossing:
-                    nextDir = 'i1' # cus choosing i0 results in going back
-                elif self.ijkCrossingNs[nextCrossing]['i1'] == currCrossing:
-                    nextDir = 'i0'
-                else:
-                    print("here")
-            else:
-                nextDir = {'j': 'k', 'k': 'j'}[incomingDir]
+            nextDir = getNextDir(incomingDir, currCrossing, nextCrossing)
             
             # record findings and proceed
             crossingsFound.append(nextCrossing)
             currCrossing, currDir = nextCrossing, nextDir
+
+            # break if necessary
+            if currCrossing == c2:
+                break
         
         # get rid of our destination crossing
         crossingsFound.pop()
@@ -176,8 +182,7 @@ class Knot:
         self.handedness[crossingIndex] = "left" if self.handedness == "right" else "right"
 
 
-    # smooth a given crossing in-place. this might require that all trivial
-    # R1 moves are performed
+    # smooth a given crossing in-place
     def smoothCrossing(self, c):
         i = self.ijkCrossings[c]['i']
         j = self.ijkCrossings[c]['j']
@@ -231,6 +236,36 @@ class Knot:
         self.ijkCrossingNs[c] = None
         self.handedness[c] = None
 
+    # repeatedly reduces all R1 crossings until there are none left
+    def reduceR1s(self):
+        # a crossing is R1 iff i = j or i = k
+        # a crossing is R1 iff i1N = jN = c or i0N = kN = c
+
+        # identify all crossings and the direction of the curve (i0 or i1)
+
+        for c in len(self.ijkCrossings):
+            if self.ijkCrossings[c] is not None:
+                i0N = self.ijkCrossingNs['i0']
+                i1N = self.ijkCrossingNs['i1']
+                jN = self.ijkCrossingNs['j']
+                kN = self.ijkCrossingNs['k']
+                if i1N == jN == c: # R1 crossing in i1 direction # TODO: THIS DOESN'T GUARANTEE R1 CROSSING
+                    csBetweenSelf = self.getCrossingsBetween(c, c, 'i1')
+                    csBetweenNext = self.getCrossingsBetween(c, kN, 'k')
+
+                elif i0N == kN == c: # R1 crossing in i0 direction
+                    pass
+                
+                for cBetweenSelf in csBetweenSelf:
+                    # remove i from crossing <- TODO: make a function for this
+
+    # TODO: working here: skip R1 reductions and move onto HOMFLY
+    # TODO: then after we can do R1 and R2 reductions
+    
+
+    # TODO: fix everything that will break if it gets a None because that crossings got deleted
+
+    # TODO: can make propogateChange function that will propogate an arc change to the end of an arc
 
 if __name__ == "__main__":
     # figure 8 knot for testing
