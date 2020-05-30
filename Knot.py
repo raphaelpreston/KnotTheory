@@ -244,43 +244,49 @@ class Knot:
         self.ijkCrossingNs[c] = None
         self.handedness[c] = None
 
-    # return an R1 crossing, the crossings between it, and the type of all crossings
-    # ("over" or "under), or None if none exist
+    # return an R1 crossing and the crossings between it, or None if none exist
     def getR1Crossing(self):
         # first ensure there aren't trivially R1 crossings with the same arc
         # entering the crossing twice. also, existence will break code below
         for crossing in range(len(self.ijkCrossings)):
-            arcs = list(self.ijkCrossings[crossing].values())
-            # see if any arc appears twice
-            doubleArc = [a for a in arcs if arcs.count(a) > 1]
-            if doubleArc:
-                print("Found a trivial R1: {} had {}".format(crossing, doubleArc))
-                return crossing
+            ijk = self.ijkCrossings[crossing]
+            if ijk is not None:
+                arcs = list(ijk.values())
+                # see if any arc appears twice
+                doubleArcList = [a for a in arcs if arcs.count(a) > 1]
+                if doubleArcList:
+
+                    # get the dirs for the double arc. must be i, j or i, k
+                    dirsForArc = [myDir for myDir, _ in ijk.items() if ijk[myDir] == doubleArcList[0]]
+                    jOrK = sorted(dirsForArc)[1]
+
+                    # get neighbor in that direction and record it
+                    jOrKN = self.ijkCrossingNs[crossing][jOrK]
+                    print("Was {}".format(jOrK))
+
+                    # loop goes in i1 direction or i0 direction depending
+                    dirToSearch = {"j": "i1", "k": "i0"}[jOrK]
+
+                    print("Found a trivial R1: {} had {}, so searching in {} until {}".format(crossing, doubleArcList, dirToSearch, jOrKN))
+                    
+                    # shortcut to get crossings between. can't call using crossing
+                    # twice because incDir won't work on crossing.
+                    between = self.getCrossingsBetween(crossing, jOrKN, dirToSearch)
+
+                    return (crossing, [c for c, _ in between] + [jOrKN])
 
         # then, all crossings between a given crossing must be "under"
         for crossing in range(len(self.ijkCrossings)):
-            for myDir in ['i0', 'i1']: # try both directions
-                print("Trying {} in {}".format(crossing, myDir))
-                desiredType = None
-                print("Crossings between {} are:".format(crossing))
-                between = self.getCrossingsBetween(crossing, crossing, myDir)
-                if any([myType == "over" for _, myType in between]):
-                    return Fa
-                for c, myType in between:
-                    print("{}, {}".format(c, myType))
-                    # break if we've found an over crossing
-                    if desiredType is None:
-                        desiredType = myType
-                    else:
-                        if myType != desiredType:
-                            desiredType = None # show we found nothing
-                            print("Enough of that. moving on...")
-                            break # move onto next direction or crossing
-                if desiredType is not None: # we found an R1 crossing
-                    print("Found: {}".format((crossing, between, desiredType)))
-                    return (crossing, 
-                        [c for c, _ in between], # only care about crossings
-                        desiredType)
+            ijk = self.ijkCrossings[crossing]
+            if ijk is not None:
+                for myDir in ['i0', 'i1']: # try both directions
+                    print("Crossings between {} are:".format(crossing))
+                    between = self.getCrossingsBetween(crossing, crossing, myDir)
+                    print(between)
+                    if all([myType == "under" for _, myType in between]):
+                        print("Found: {}".format((crossing, between)))
+                        return (crossing, 
+                            [c for c, _ in between]) # only care about crossings
         return None
 
 
@@ -291,6 +297,7 @@ class Knot:
 
         # identify an R1 crossing and remove it via an R1 move
         r1Crossing = self.getR1Crossing()
+        print(r1Crossing)
 
         # if r1Crossing is None:
 
@@ -362,15 +369,10 @@ if __name__ == "__main__":
     printStuff()
 
     # test swap crossings
-    # swap = 0
-    # myKnot.swapCrossing(swap)
+    swap = 0
+    myKnot.swapCrossing(swap)
 
-    # print("\nAfter swapping {}".format(swap))
-    # printStuff()
-
-    # test R1 reduction
-    myKnot.reduceR1s()
-    print("After reduce R1s:")
+    print("\nAfter swapping {}".format(swap))
     printStuff()
 
     # test smooth crossings
@@ -379,6 +381,11 @@ if __name__ == "__main__":
 
     # print("\nAfter smoothing {}".format(smooth))
     # printStuff()
+
+    # test R1 reduction
+    myKnot.reduceR1s()
+    print("After reduce R1s:")
+    printStuff()
 
 # TODO:
 # - undo all trivial R1 moves to cut down on necessary recursive steps also cus ez
