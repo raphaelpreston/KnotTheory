@@ -44,6 +44,12 @@
  - when using first derivative to get slope, get as close as you can do perpendicular against the end boundary of the line
  - intersection likely to be near another line
 
+
+- always trying to balance computation on the fly vs computation on changes, like with
+being able to quickly compute crossings between or keeping track of the "flipped" knot so that
+r1 crossing detection becomes trivial, it's the same arc on either one or the other.
+keeping arc neighbors would do this too.
+
 ## Credit:
 # StackOverflow
  - 

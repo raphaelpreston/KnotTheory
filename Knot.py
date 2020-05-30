@@ -58,7 +58,8 @@ class Knot:
 
     # returns the incoming direction from c1 into c2 given outgoing dir from c1
     # you need an outgoing dir because it's possible that crossings are
-    # connected via multiple directions
+    # connected via multiple directions. this won't work if the same arc
+    # enters c2 in multiple directions
     def getIncomingDir(self, c1, outDir, c2):
         # error check
         if self.ijkCrossingNs[c1][outDir] != c2:
@@ -75,8 +76,8 @@ class Knot:
         return self.getDirFromArcNum(c2, arrivalArc)
 
 
-    # return the crossings between crossing1 -> crossing2 in the inDir (i0/1,
-    # j, or k) direction
+    # return the crossings & (over, under) of each crossing between
+    # crossing1 -> crossing2 in the inDir (i0/1, j, or k) direction
     def getCrossingsBetween(self, c1, c2, inDir):
 
         def getNextDir(incomingDir, currCrossing, nextCrossing):
@@ -85,9 +86,10 @@ class Knot:
                     return 'i1' # cus choosing i0 results in going back
                 elif self.ijkCrossingNs[nextCrossing]['i1'] == currCrossing:
                     return 'i0'
+                else:
+                    print("Error: ")
             else:
                 return {'j': 'k', 'k': 'j'}[incomingDir]
-
 
         # keep track of crossings inbetween
         crossingsFound = []
@@ -106,9 +108,10 @@ class Knot:
             
             # figure out in which direction to continue searching
             nextDir = getNextDir(incomingDir, currCrossing, nextCrossing)
-            
+
             # record findings and proceed
-            crossingsFound.append(nextCrossing)
+            myType = "over" if nextDir in ['i0', 'i1'] else "under"
+            crossingsFound.append((nextCrossing, myType))
             currCrossing, currDir = nextCrossing, nextDir
 
             # break if necessary
@@ -134,12 +137,13 @@ class Knot:
         # get the crossings over which the i, j, or k arcs pass through (as i),
         # but don't need to know the crossings between i and iCross1.
         # the crossings between inherently are crossings where the arc is i
-        i0CrossingsAsI = [
-            c for c in self.getCrossingsBetween(crossingIndex, iCross0, 'i0')
+        i0CrossingsAsI = [ # only care about crossing numbers
+            c for c, _ in self.getCrossingsBetween(crossingIndex, iCross0, 'i0')
         ]
-        kCrossingsAsI =  [
-            c for c in self.getCrossingsBetween(crossingIndex, kCrossOther, 'k')
+        kCrossingsAsI = [
+            c for c, _ in self.getCrossingsBetween(crossingIndex, kCrossOther, 'k')
         ]
+        
 
         
         # from crossing -> iCross1 stays i's old arcNum, but it's the new k
@@ -196,7 +200,7 @@ class Knot:
 
         # k arc becomes i
         # update the crossings on k
-        for cBetween in self.getCrossingsBetween(c, kCrossOther, 'k'):
+        for cBetween, _ in self.getCrossingsBetween(c, kCrossOther, 'k'):
             self.ijkCrossings[cBetween]['i'] = i
         
         # update the other end of k
@@ -205,7 +209,7 @@ class Knot:
 
         # i1 arc becomes j
         # update the crossings on i1
-        for cBetween in self.getCrossingsBetween(c, iCross1, 'i1'):
+        for cBetween, _ in self.getCrossingsBetween(c, iCross1, 'i1'):
             self.ijkCrossings[cBetween]['i'] = j
 
         # update the other end of i1
@@ -240,69 +244,44 @@ class Knot:
         self.ijkCrossingNs[c] = None
         self.handedness[c] = None
 
-    # return an R1 crossing or None if none exist
+    # return an R1 crossing, the crossings between it, and the type of all crossings
+    # ("over" or "under), or None if none exist
     def getR1Crossing(self):
+        # first ensure there aren't trivially R1 crossings with the same arc
+        # entering the crossing twice. also, existence will break code below
+        for crossing in range(len(self.ijkCrossings)):
+            arcs = list(self.ijkCrossings[crossing].values())
+            # see if any arc appears twice
+            doubleArc = [a for a in arcs if arcs.count(a) > 1]
+            if doubleArc:
+                print("Found a trivial R1: {} had {}".format(crossing, doubleArc))
+                return crossing
 
-        def getNextDir(incomingDir, currCrossing, nextCrossing):
-            if incomingDir == 'i': # not clear if i0 or i1
-                if self.ijkCrossingNs[nextCrossing]['i0'] == currCrossing:
-                    return 'i1' # cus choosing i0 results in going back
-                elif self.ijkCrossingNs[nextCrossing]['i1'] == currCrossing:
-                    return 'i0'
-            else:
-                return {'j': 'k', 'k': 'j'}[incomingDir]
-
-        # choose starting crossing. determine if there is at least one crossing.
-        source = None
-        for i in range(self.ijkCrossings):
-            if self.ijkCrossings[i] is not None:
-                source = i
-                break
-        if source is None: # return None if no crossings exist
-            return None
-        
-        # have to loop around in both directions to find all potential R1s
-        for inDir in ['i1', 'i0']:
-            # keep track of crossings between each crossing and itself in a list in
-            # form crossingNum => (otherCrossing, "over" or "under"). crossingNum
-            # crosses ____ otherCrossing
-            csBetweenSelf = [[] for _ in self.ijkCrossings]
-            csInQ = set() # cs that we've run across and haven't run into again
-
-            # keep going until we hit source again
-            currDir = inDir # i0, i1, j, or k
-            while True: # want to jump at least once
-
-                # get the next crossing in direction
-                nextCrossing = self.ijkCrossingNs[currCrossing][currDir]
-
-                # get the incoming direction into the neighbor crossing
-                incomingDir = self.getIncomingDir(currCrossing, currDir,
-                    nextCrossing)
-                
-                # figure out in which direction to continue searching
-                nextDir = getNextDir(incomingDir, currCrossing, nextCrossing)
-                
-                # determine if we've hit any crossing again
-                if nextCrossing in csInQ:
-                    pass
-                else:
-                    csInQ.add(nextCrossing)
-                
-                
-                crossingsFound.append(nextCrossing)
-                currCrossing, currDir = nextCrossing, nextDir
-
-                # break if necessary
-                if currCrossing == c2:
-                    break
-        
-        # get rid of our destination crossing
-        crossingsFound.pop()
-        return crossingsFound
-        
-
-
+        # then, all crossings between a given crossing must be "under"
+        for crossing in range(len(self.ijkCrossings)):
+            for myDir in ['i0', 'i1']: # try both directions
+                print("Trying {} in {}".format(crossing, myDir))
+                desiredType = None
+                print("Crossings between {} are:".format(crossing))
+                between = self.getCrossingsBetween(crossing, crossing, myDir)
+                if any([myType == "over" for _, myType in between]):
+                    return Fa
+                for c, myType in between:
+                    print("{}, {}".format(c, myType))
+                    # break if we've found an over crossing
+                    if desiredType is None:
+                        desiredType = myType
+                    else:
+                        if myType != desiredType:
+                            desiredType = None # show we found nothing
+                            print("Enough of that. moving on...")
+                            break # move onto next direction or crossing
+                if desiredType is not None: # we found an R1 crossing
+                    print("Found: {}".format((crossing, between, desiredType)))
+                    return (crossing, 
+                        [c for c, _ in between], # only care about crossings
+                        desiredType)
+        return None
 
 
     # repeatedly reduces all R1 crossings until there are none left
@@ -311,23 +290,34 @@ class Knot:
         # a crossing is R1 iff i1N = jN = c or i0N = kN = c
 
         # identify an R1 crossing and remove it via an R1 move
-        for c in len(self.ijkCrossings):
-            if self.ijkCrossings[c] is not None:
-                i0N = self.ijkCrossingNs['i0']
-                i1N = self.ijkCrossingNs['i1']
-                jN = self.ijkCrossingNs['j']
-                kN = self.ijkCrossingNs['k']
+        r1Crossing = self.getR1Crossing()
 
-                if i1N == jN == c: # loops back onto itself
+        # if r1Crossing is None:
 
-                    csBetweenSelf = self.getCrossingsBetween(c, c, 'i1')
-                    csBetweenNext = self.getCrossingsBetween(c, kN, 'k')
 
-                elif i0N == kN == c: # R1 crossing in i0 direction
-                    pass
+
+
+        # for c in len(self.ijkCrossings):
+        #     if self.ijkCrossings[c] is not None:
+        #         i0N = self.ijkCrossingNs['i0']
+        #         i1N = self.ijkCrossingNs['i1']
+        #         jN = self.ijkCrossingNs['j']
+        #         kN = self.ijkCrossingNs['k']
+
+        #         if i1N == jN == c: # loops back onto itself
+
+        #             csBetweenSelf = [ # only care about crossings
+        #                 c for c, _ in self.getCrossingsBetween(c, c, 'i1')
+        #             ]
+        #             csBetweenNext = [
+        #                 c for c, _ in self.getCrossingsBetween(c, kN, 'k')
+        #             ]
+
+        #         elif i0N == kN == c: # R1 crossing in i0 direction
+        #             pass
                 
-                for cBetweenSelf in csBetweenSelf:
-                    pass
+        #         for cBetweenSelf in csBetweenSelf:
+        #             pass
                     # remove i from crossing <- TODO: make a function for this
 
 
@@ -372,18 +362,23 @@ if __name__ == "__main__":
     printStuff()
 
     # test swap crossings
-    swap = 0
-    myKnot.swapCrossing(swap)
+    # swap = 0
+    # myKnot.swapCrossing(swap)
 
-    print("\nAfter swapping {}".format(swap))
+    # print("\nAfter swapping {}".format(swap))
+    # printStuff()
+
+    # test R1 reduction
+    myKnot.reduceR1s()
+    print("After reduce R1s:")
     printStuff()
 
     # test smooth crossings
-    smooth = 1
-    myKnot.smoothCrossing(smooth)
+    # smooth = 1
+    # myKnot.smoothCrossing(smooth)
 
-    print("\nAfter smoothing {}".format(smooth))
-    printStuff()
+    # print("\nAfter smoothing {}".format(smooth))
+    # printStuff()
 
 # TODO:
 # - undo all trivial R1 moves to cut down on necessary recursive steps also cus ez
