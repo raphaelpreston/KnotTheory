@@ -244,7 +244,9 @@ class Knot:
         self.ijkCrossingNs[c] = None
         self.handedness[c] = None
 
-    # return an R1 crossing and the crossings between it, or None if none exist
+    # return an R1 crossing and the crossings between it, or None if none exist.
+    # guaranteed to not return a crossing in a direction with a path with a vertex
+    # that appears twice
     def getR1Crossing(self):
         # first ensure there aren't trivially R1 crossings with the same arc
         # entering the crossing twice. also, existence will break code below
@@ -252,7 +254,7 @@ class Knot:
             ijk = self.ijkCrossings[crossing]
             if ijk is not None:
                 arcs = list(ijk.values())
-                # see if any arc appears twice
+                # see if any arc appears twice in a crossing
                 doubleArcList = [a for a in arcs if arcs.count(a) > 1]
                 if doubleArcList:
 
@@ -262,74 +264,75 @@ class Knot:
 
                     # get neighbor in that direction and record it
                     jOrKN = self.ijkCrossingNs[crossing][jOrK]
-                    print("Was {}".format(jOrK))
 
                     # loop goes in i1 direction or i0 direction depending
                     dirToSearch = {"j": "i1", "k": "i0"}[jOrK]
-
-                    print("Found a trivial R1: {} had {}, so searching in {} until {}".format(crossing, doubleArcList, dirToSearch, jOrKN))
                     
                     # shortcut to get crossings between. can't call using crossing
                     # twice because incDir won't work on crossing.
                     between = self.getCrossingsBetween(crossing, jOrKN, dirToSearch)
 
-                    return (crossing, [c for c, _ in between] + [jOrKN])
+                    return (crossing,
+                        [c for c, _ in between] + [jOrKN],
+                        dirToSearch,
+                        "over"
+                    )
 
         # then, all crossings between a given crossing must be "under"
         for crossing in range(len(self.ijkCrossings)):
             ijk = self.ijkCrossings[crossing]
             if ijk is not None:
                 for myDir in ['i0', 'i1']: # try both directions
-                    print("Crossings between {} are:".format(crossing))
                     between = self.getCrossingsBetween(crossing, crossing, myDir)
-                    print(between)
                     if all([myType == "under" for _, myType in between]):
-                        print("Found: {}".format((crossing, between)))
-                        return (crossing, 
-                            [c for c, _ in between]) # only care about crossings
-        return None
-
+                        return (
+                            crossing, 
+                            [c for c, _ in between], # only care about crossings
+                            myDir,
+                            "under"
+                        )
+        return None, None, None
 
     # repeatedly reduces all R1 crossings until there are none left
     def reduceR1s(self):
-        # a crossing is R1 iff i = j or i = k
-        # a crossing is R1 iff i1N = jN = c or i0N = kN = c
 
         # identify an R1 crossing and remove it via an R1 move
-        r1Crossing = self.getR1Crossing()
-        print(r1Crossing)
+        r1Crossing, csBetweenSelf, myDir = self.getR1Crossing()
+        print(r1Crossing, csBetweenSelf, myDir)
+        # we know that the path doesn't contain the same vertex twice
+        # if the path goes all "over", then all we have to do is remove crossings
+        # and adjust neighbors, no connecting has to be done
+        
+        # remove each crossing on the path
+        # for cBetween in csBetweenSelf:
+        if True:
+            cBetween = csBetweenSelf[0]
 
-        # if r1Crossing is None:
+            # each crossing has a single partner crossing. all crossings are unique.
+            # the path either goes over all crossings or under all crossings.
 
+            # find the crossing's partner crossing aka where it leaves the loop again
+            # if the type is "over", then the partner is in the k direction,
+            # if it's "under", then the partner is in the i1 direction
 
+            # find the neighbors to the outside of the loop for each set of partners
 
+            # find the immediate neighbors inside of the loop (between the partners)
 
-        # for c in len(self.ijkCrossings):
-        #     if self.ijkCrossings[c] is not None:
-        #         i0N = self.ijkCrossingNs['i0']
-        #         i1N = self.ijkCrossingNs['i1']
-        #         jN = self.ijkCrossingNs['j']
-        #         kN = self.ijkCrossingNs['k']
+            # the outside neighbor(s) (maybe the they're the same) need their neighbors
+            # to become the neighbors inside the loop. if there are no neighbors
+            # inside the loop then they become neighbors of each other
 
-        #         if i1N == jN == c: # loops back onto itself
+            # if outside neighbors are the same, then that neighbor's
+            # neighbor becomes itself (in 2 directions)
 
-        #             csBetweenSelf = [ # only care about crossings
-        #                 c for c, _ in self.getCrossingsBetween(c, c, 'i1')
-        #             ]
-        #             csBetweenNext = [
-        #                 c for c, _ in self.getCrossingsBetween(c, kN, 'k')
-        #             ]
-
-        #         elif i0N == kN == c: # R1 crossing in i0 direction
-        #             pass
-                
-        #         for cBetweenSelf in csBetweenSelf:
-        #             pass
-                    # remove i from crossing <- TODO: make a function for this
+            # remove both partner crossings
+            self.removeCrossing(cBetween)
 
 
     # TODO: working here: skip R1 reductions and move onto HOMFLY
     # TODO: then after we can do R1 and R2 reductions
+    # TODO: SMOOTHING needs to recognize when it's made a link
     
 
     # TODO: fix everything that will break if it gets a None because that crossings got deleted
@@ -383,9 +386,10 @@ if __name__ == "__main__":
     # printStuff()
 
     # test R1 reduction
+    print()
     myKnot.reduceR1s()
-    print("After reduce R1s:")
-    printStuff()
+    # print("After reduce R1s:")
+    # printStuff()
 
 # TODO:
 # - undo all trivial R1 moves to cut down on necessary recursive steps also cus ez
