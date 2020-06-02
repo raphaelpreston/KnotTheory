@@ -44,7 +44,7 @@ class Knot:
             return
         return otherCrossing[0]
     
-
+    # return c2's persepective of incoming direction from c1 in outDir to c2
     def getIncomingDir(self, c1, outDir, c2):
         # error check
         if self.ijkCrossingNs[c1][outDir] != c2:
@@ -53,9 +53,13 @@ class Knot:
 
         # if c1 and c2 are the same or they don't share an i crossing
         if c1 == c2 or self.ijkCrossings[c1]['i'] != self.ijkCrossings[c2]['i']:
-            return {'i1': 'j', 'i0': 'k', 'j': 'i1', 'k': 'i0'}[outDir]
+            v = {'i1': 'j', 'i0': 'k', 'j': 'i1', 'k': 'i0'}[outDir]
+            print("incoming dir from {} through {} into {} is {}".format(c1, outDir, c2, v))
+            return v
         else: # if they share an 'i' arc, it's between i0 and i1 only
-            return {'i1': 'i0', 'i0': 'i1'}[outDir]
+            v = {'i1': 'i0', 'i0': 'i1', 'j': 'k', 'k': 'j'}[outDir]
+            print("incoming dir from {} through {} into {} is {}".format(c1, outDir, c2, v))
+            return v
 
 
     # return the crossings & (over, under) of each crossing between
@@ -114,8 +118,6 @@ class Knot:
         kCrossingsAsI = [
             c for c, _ in self.getCrossingsBetween(crossingIndex, kCrossOther, 'k')
         ]
-        
-
         
         # from crossing -> iCross1 stays i's old arcNum, but it's the new k
         newK = i
@@ -307,36 +309,48 @@ class Knot:
             self.removeCrossing(cBetween)
 
     # remove a crossing from a knot diagram, connecting the neighbors to each other
+    # it's possible that this puts the diagram in an invalid state
     def removeCrossing(self, c):
-        jN = self.ijkCrossingNs[c]['j']
-        i1N = self.ijkCrossingNs[c]['i1']
-        i0N = self.ijkCrossingNs[c]['i0']
-        kN = self.ijkCrossingNs[c]['k']
+        # get the arcs
+        crossing = self.ijkCrossings[c]
+        i, j, k = crossing['i'], crossing['j'], crossing['k']
 
-        # this crossing is the only one left on it's knot
+        # get neighbors and their incoming directions from c into given neighbor
+        jN = self.ijkCrossingNs[c]['j']
+        jNInc = self.getIncomingDir(c, 'j', jN)
+        kN = self.ijkCrossingNs[c]['k']
+        kNInc = self.getIncomingDir(c, 'k', kN)
+        i1N = self.ijkCrossingNs[c]['i1']
+        i1NInc = self.getIncomingDir(c, 'i1', i1N)
+        i0N = self.ijkCrossingNs[c]['i0']
+        i0NInc = self.getIncomingDir(c, 'i0', i0N)
+
+        # this crossing is the only one left on its knot
         if all([n == jN for n in [i1N, i0N, kN]]):
-            # no neighbors to set, just increase unknots
+            # no arcs or neighbors to set, just increase unknots
             self.numUnknots += 1
         else:
+            # update arcs
+            jCrossOther = self.getOtherJKCrossing(c, 'j')
+            kCrossOther = self.getOtherJKCrossing(c, 'k')
+
+            # the k arc becomes the j arc
+            for cr, _ in self.getCrossingsBetween(c, kCrossOther, 'k'):
+                self.ijkCrossings[cr]['i'] = j
+            
+            # update the tip of the k arc
+            self.ijkCrossings[kCrossOther]['j'] = j
+
             # update neighbors
-            self.ijkCrossingNs[jN]['j'] = kN
-            self.ijkCrossingNs[c]['i1'] = i0N
-            self.ijkCrossingNs[c]['i0'] = i1N
-            self.ijkCrossingNs[c]['k'] = jN
+            self.ijkCrossingNs[jN][jNInc] = kN
+            self.ijkCrossingNs[kN][kNInc] = jN
+            self.ijkCrossingNs[i0N][i0NInc] = i1N
+            self.ijkCrossingNs[i1N][i1NInc] = i0N
 
         # remove crossing
         self.ijkCrossings[c] = None
         self.ijkCrossingNs[c] = None
         self.handedness[c] = None
-
-    # TODO: working here: skip R1 reductions and move onto HOMFLY
-    # TODO: then after we can do R1 and R2 reductions
-    # TODO: SMOOTHING needs to recognize when it's made a link
-    
-
-    # TODO: fix everything that will break if it gets a None because that crossings got deleted
-
-    # TODO: can make propogateChange function that will propogate an arc change to the end of an arc
 
 if __name__ == "__main__":
 
@@ -377,11 +391,11 @@ if __name__ == "__main__":
     print("\nAfter swapping {}".format(swap))
     printStuff()
 
-    print("Incoming dir from 0 -i0-> 1 is {}".format(myKnot.getIncomingDir(0, 'i0', 1)))
+    print(myKnot.getIncomingDir(0, 'k', 3))
 
     # remove = 0
     # myKnot.removeCrossing(remove)
-    # print("After remove {}".format(remove))
+    # print("After removing {}".format(remove))
     # printStuff()
 
     # test smooth crossings

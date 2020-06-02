@@ -53,6 +53,7 @@ keeping arc neighbors would do this too.
   "arc", even if the crossing is an "i". Then have a function to compute the "names" of the arcs
   on the fly.
 - tough to figure out incoming dir for unknots or loops, there is background that you need about knots
+- propogate crossing change function?
 
 ## Credit:
 # StackOverflow
