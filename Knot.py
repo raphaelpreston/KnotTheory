@@ -50,26 +50,6 @@ class Knot:
         if self.ijkCrossingNs[c1][outDir] != c2:
             print("Error: C1 -> outdir didn't lead to C2")
             return
-        
-        # simplify direction to i if it's i0/i1
-        modifiedDir = "i" if outDir == "i0" or outDir == "i1" else outDir
-
-        # get the arcNum on which we departed from c1 and arrived onto c2
-        arrivalArc = self.ijkCrossings[c1][modifiedDir]
-
-        # the incoming direction is the dir which is the incoming arc
-        for arcType, otherArcNum in self.ijkCrossings[c2].items():
-            if arrivalArc == otherArcNum:
-                return arcType
-        return None
-
-    def getIncomingDirTest(self, c1, outDir, c2):
-        # error check
-        if self.ijkCrossingNs[c1][outDir] != c2:
-            print("Error: C1 -> outdir didn't lead to C2")
-            return
-
-        print("computing incoming dir into {} from {} in {} dir".format(c2, c1, outDir))
 
         # if c1 and c2 are the same or they don't share an i crossing
         if c1 == c2 or self.ijkCrossings[c1]['i'] != self.ijkCrossings[c2]['i']:
@@ -78,109 +58,9 @@ class Knot:
             return {'i1': 'i0', 'i0': 'i1'}[outDir]
 
 
-
-        
-        
-        # # simplify direction to i if it's i0/i1
-        # modifiedDir = "i" if outDir == "i0" or outDir == "i1" else outDir
-
-        # # get the arcNum on which we departed from c1
-        # outgoingArc = self.ijkCrossings[c1][modifiedDir]
-
-        # # get all directions for n that share c1's outgoing arc
-        # pots = []
-        # for arcType, otherArcNum in self.ijkCrossings[n].items():
-        #     if outgoingArc == otherArcNum:
-        #         pots.append(arcType)
-        # print("potentials are {}".format(pots))
-
-        # # expand 'i' potentials to have both i0 and i1
-        # temp, pots = pots, []
-        # for myDir in temp:
-        #     if myDir == 'i':
-        #         pots.extend(['i0', 'i1'])
-        #     else:
-        #         pots.append(myDir)
-        # print("pots after expanding: {}".format(pots))
-
-        # if len(pots) == 1: # not necessary to keep searching
-        #     return pots[0]
-
-        # # test n's neighbors in potential directions manually
-        # temp, pots = pots, []
-        # for nDir in temp:
-        #     nN = self.ijkCrossingNs[n][nDir]
-        #     print('neighbor of {} in dir {} is {}'.format(n, nDir, nN))
-        #     if c1 == nN:
-        #         pots.append(nDir)
-            
-        # # at this point, if there is more than one potential direction, then:
-        # # - c1 and c2 are distinct
-        # # - c1's arc in outgoing direction is shared by more than one direction of c2
-        # # - c2's neighbor in all directions is c1 (could be two or three directions)
-        # #       like with a hopf link
-        # # - 
-        
-        # print("potentials after manual neighbor testing: {}".format(pots))
-
-
-
-        # reduce potentials to those who 
-        
-        # if n has two connections to the outgoingArc, one of them is i and one
-        # of them is j or k
-
-        # it's not possible for crossing c's neighbor to be neighbors with c in 
-        # two directions AND share the same arcnum twice
-
-        
-        # otherwise, have to loop through c1's neighbor's neighbors manually
-        
-        
-        # a crossing can't have the same neighbor in two directions without that
-        # neighbor being itself
-
-        # if a crossing has the same neighbor in two directions, it must have
-        # the same neighbor in three directions
-        
-        # nJN = self.ijkCrossingNs[c]['j']
-        # nI1N = self.ijkCrossingNs[c]['i1']
-        # nI0N = self.ijkCrossingNs[c]['i0']
-        # nKN = self.ijkCrossingNs[c]['k']
-
-        
-        
-
-        # get the candidates of incoming dir by cross-referencing incoming arc
-        
-
-        # if len(pots) == 1: # only one potential
-        #     pot = pots[0]
-        #     if pot == 'i':
-
-        #     else:
-        #         return pot
-        # elif len(pots) == 2: # same arc loops back into the crossing again
-            
-        # elif len(pots) == 3: # c1 must be c2, there's only one crossing left
-        #     
-        # return None
-
-
     # return the crossings & (over, under) of each crossing between
     # crossing1 -> crossing2 in the inDir (i0/1, j, or k) direction
     def getCrossingsBetween(self, c1, c2, inDir):
-
-        def getNextDir(incomingDir, currCrossing, nextCrossing):
-            if incomingDir == 'i': # not clear if i0 or i1
-                if self.ijkCrossingNs[nextCrossing]['i0'] == currCrossing:
-                    return 'i1' # cus choosing i0 results in going back
-                elif self.ijkCrossingNs[nextCrossing]['i1'] == currCrossing:
-                    return 'i0'
-                else:
-                    print("Error: ")
-            else:
-                return {'j': 'k', 'k': 'j'}[incomingDir]
 
         # keep track of crossings inbetween
         crossingsFound = []
@@ -198,7 +78,7 @@ class Knot:
                 nextCrossing)
             
             # figure out in which direction to continue searching
-            nextDir = getNextDir(incomingDir, currCrossing, nextCrossing)
+            nextDir = {'i0': 'i1', 'i1': 'i0', 'j': 'k', 'k': 'j'}[incomingDir]
 
             # record findings and proceed
             myType = "over" if nextDir in ['i0', 'i1'] else "under"
@@ -497,7 +377,7 @@ if __name__ == "__main__":
     print("\nAfter swapping {}".format(swap))
     printStuff()
 
-    print("Incoming dir from 0 -i0-> 1 is {}".format(myKnot.getIncomingDirTest(0, 'i0', 1)))
+    print("Incoming dir from 0 -i0-> 1 is {}".format(myKnot.getIncomingDir(0, 'i0', 1)))
 
     # remove = 0
     # myKnot.removeCrossing(remove)
