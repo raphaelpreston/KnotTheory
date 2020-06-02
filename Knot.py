@@ -71,54 +71,57 @@ class Knot:
 
         print("computing incoming dir into {} from {} in {} dir".format(c2, c1, outDir))
 
-        # get neighbor of c1 in the outgoing direction
-        n = self.ijkCrossingNs[c1][outDir]
-
-        # if that neighbor is itself, then we know the incoming direction
-        if c1 == n:
+        # if c1 and c2 are the same or they don't share an i crossing
+        if c1 == c2 or self.ijkCrossings[c1]['i'] != self.ijkCrossings[c2]['i']:
             return {'i1': 'j', 'i0': 'k', 'j': 'i1', 'k': 'i0'}[outDir]
+        else: # if they share an 'i' arc, it's between i0 and i1 only
+            return {'i1': 'i0', 'i0': 'i1'}[outDir]
+
+
+
         
-        # simplify direction to i if it's i0/i1
-        modifiedDir = "i" if outDir == "i0" or outDir == "i1" else outDir
+        
+        # # simplify direction to i if it's i0/i1
+        # modifiedDir = "i" if outDir == "i0" or outDir == "i1" else outDir
 
-        # get the arcNum on which we departed from c1
-        outgoingArc = self.ijkCrossings[c1][modifiedDir]
+        # # get the arcNum on which we departed from c1
+        # outgoingArc = self.ijkCrossings[c1][modifiedDir]
 
-        # get all directions for n that share c1's outgoing arc
-        pots = []
-        for arcType, otherArcNum in self.ijkCrossings[n].items():
-            if outgoingArc == otherArcNum:
-                pots.append(arcType)
-        print("potentials are {}".format(pots))
+        # # get all directions for n that share c1's outgoing arc
+        # pots = []
+        # for arcType, otherArcNum in self.ijkCrossings[n].items():
+        #     if outgoingArc == otherArcNum:
+        #         pots.append(arcType)
+        # print("potentials are {}".format(pots))
 
-        # expand 'i' potentials to have both i0 and i1
-        temp, pots = pots, []
-        for myDir in temp:
-            if myDir == 'i':
-                pots.extend(['i0', 'i1'])
-            else:
-                pots.append(myDir)
-        print("pots after expanding: {}".format(pots))
+        # # expand 'i' potentials to have both i0 and i1
+        # temp, pots = pots, []
+        # for myDir in temp:
+        #     if myDir == 'i':
+        #         pots.extend(['i0', 'i1'])
+        #     else:
+        #         pots.append(myDir)
+        # print("pots after expanding: {}".format(pots))
 
-        if len(pots) == 1: # not necessary to keep searching
-            return pots[0]
+        # if len(pots) == 1: # not necessary to keep searching
+        #     return pots[0]
 
-        # test n's neighbors in potential directions manually
-        temp, pots = pots, []
-        for nDir in temp:
-            nN = self.ijkCrossingNs[n][nDir]
-            print('neighbor of {} in dir {} is {}'.format(n, nDir, nN))
-            if c1 == nN:
-                pots.append(nDir)
+        # # test n's neighbors in potential directions manually
+        # temp, pots = pots, []
+        # for nDir in temp:
+        #     nN = self.ijkCrossingNs[n][nDir]
+        #     print('neighbor of {} in dir {} is {}'.format(n, nDir, nN))
+        #     if c1 == nN:
+        #         pots.append(nDir)
             
-        # at this point, if there is more than one potential direction, then:
-        # - c1 and c2 are distinct
-        # - c1's arc in outgoing direction is shared by more than one direction of c2
-        # - c2's neighbor in all directions is c1 (could be two or three directions)
-        #       like with a hopf link
-        # - 
+        # # at this point, if there is more than one potential direction, then:
+        # # - c1 and c2 are distinct
+        # # - c1's arc in outgoing direction is shared by more than one direction of c2
+        # # - c2's neighbor in all directions is c1 (could be two or three directions)
+        # #       like with a hopf link
+        # # - 
         
-        print("potentials after manual neighbor testing: {}".format(pots))
+        # print("potentials after manual neighbor testing: {}".format(pots))
 
 
 
