@@ -57,6 +57,7 @@ keeping arc neighbors would do this too.
 - probably would have been easier to represent each edge from a vertex to another as a distinct
   "arc", even if the crossing is an "i". Then have a function to compute the "names" of the arcs
   on the fly.
+ - the "path" is an exmple of something that's computed on the fly. useful for getting crossings inbetween two.
 - tough to figure out incoming dir for unknots or loops, there is background that you need about knots
 - propogate crossing change function?
 
