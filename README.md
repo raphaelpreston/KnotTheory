@@ -49,6 +49,10 @@
  - has a problem with small arcs for some reason
  - assumption: i0 and j dirs must arrive at an i1 and i1, k dirs must arrive at i0 crossings
 
+ - alternative way to get incoming direction from c1 in dir to c2:
+ Get the endpoints of the arc in dir from c1. If the second (or first, depending 
+ on dir) is c2, then you know which way it's coming in to c2. The key is that you know that c1 and c2 are neighbors.
+
 
 - always trying to balance computation on the fly vs computation on changes, like with
 being able to quickly compute crossings between or keeping track of the "flipped" knot so that

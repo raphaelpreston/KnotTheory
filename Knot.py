@@ -169,7 +169,6 @@ class Knot:
         # update the other end of k
         self.ijkCrossings[kCrossOther]['j'] = i
 
-
         # i1 arc becomes j
         # update the crossings on i1
         for cBetween, _ in self.getCrossingsBetween(c, iCross1, 'i1'):
@@ -178,25 +177,19 @@ class Knot:
         # update the other end of i1
         self.ijkCrossings[iCross1]['j'] = j
 
+        # update neighbors
+        i0N, i0NIncDir = self.ijkCrossingNs[c]['i0']
+        i1N, i1NIncDir = self.ijkCrossingNs[c]['i1']
+        jN, jNIncDir = self.ijkCrossingNs[c]['j']
+        kN, kNIncDir = self.ijkCrossingNs[c]['k']
 
-        # update neighbors of all neighbors
-        jN = self.ijkCrossingNs[c]['j']
-        i1N = self.ijkCrossingNs[c]['i1']
-        i0N = self.ijkCrossingNs[c]['i0']
-        kN = self.ijkCrossingNs[c]['k']
-
-        # connect neighbors between jN -> i1 curve. need to know if nearest
-        # neighbor is the end of the arc to determine direction types
-        jNOutDir = 'k' if jCrossOther == jN else 'i1'
-        i1NInDir = 'j' if iCross1 == i1N else 'i0'
-        self.ijkCrossingNs[jN][jNOutDir] = i1N
-        self.ijkCrossingNs[i1N][i1NInDir] = jN
+        # connect neighbors between jN -> i1 curve
+        self.ijkCrossingNs[jN][jNIncDir] = i1N
+        self.ijkCrossingNs[i1N][i1NIncDir] = jN
 
         # connect neighbors between i0 -> k curve
-        i0NOutDir = 'k' if iCross0 == i0N else 'i1'
-        kNInDir = 'j' if kCrossOther == kN else 'i0'
-        self.ijkCrossingNs[i0N][i0NOutDir] = kN
-        self.ijkCrossingNs[kN][kNInDir] = i0N
+        self.ijkCrossingNs[i0N][i0NIncDir] = kN
+        self.ijkCrossingNs[kN][kNIncDir] = i0N
 
         # determine if we've just made an uknot
         print("Before deleting:")
@@ -367,15 +360,21 @@ if __name__ == "__main__":
             print("  {}: {}".format(i, c))
         print(handedness)
 
-    print("preswap: ")
+    print("original: ")
+    printStuff()
+
+    # test smooth crossings
+    smooth = 0
+    myKnot.smoothCrossing(smooth)
+    print("\nAfter smoothing {}".format(smooth))
     printStuff()
 
     # test swap crossings
-    swap = 0
-    myKnot.swapCrossing(swap)
+    # swap = 0
+    # myKnot.swapCrossing(swap)
 
-    print("\nAfter swapping {}".format(swap))
-    printStuff()
+    # print("\nAfter swapping {}".format(swap))
+    # printStuff()
 
     # print(myKnot.getIncomingDir(0, 'k', 3))
 
@@ -408,3 +407,8 @@ if __name__ == "__main__":
 # - it's possible to undo R2 moves using neighbor checking
 # - create an iterator or just a function that returns a path looping around the knot
 #  - can be used in getCrossingsBetween and also figuring out if an R1 crossing
+# in theory, we technically don't need to know how each neighbor arrives:
+        # jNOutDir = 'k' if jCrossOther == jN else 'i1'
+        # i1NInDir = 'j' if iCross1 == i1N else 'i0'
+        # i0NOutDir = 'k' if iCross0 == i0N else 'i1'
+        # kNInDir = 'j' if kCrossOther == kN else 'i0'
