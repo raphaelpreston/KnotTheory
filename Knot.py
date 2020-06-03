@@ -330,12 +330,15 @@ class Knot:
         i, j, k = crossing['i'], crossing['j'], crossing['k']
 
         # get neighbors and their incoming directions from c into given neighbor
-        jN, jNInc = self.ijkCrossingNs[c]['j']
-        kN, kNInc = self.ijkCrossingNs[c]['k']
-        i1N, i1NInc = self.ijkCrossingNs[c]['i1']
-        i0N, i0NInc = self.ijkCrossingNs[c]['i0']
+        i0N, i0NInc = self.getNAndDir(c, 'i0')
+        i1N, i1NInc = self.getNAndDir(c, 'i1')
+        jN, jNInc = self.getNAndDir(c, 'j')
+        kN, kNInc = self.getNAndDir(c, 'k')
+        
+        # save ijkCrossing changes locally so getCrossingsBetween works
+        ijkCrossings = copy.deepcopy(self.ijkCrossings)
 
-        # this crossing is the only one left on its knot
+        # this crossing could be the only one left on its knot
         if all([n == jN for n in [i1N, i0N, kN]]):
             # no arcs or neighbors to set, just increase unknots
             self.numUnknots += 1
@@ -346,16 +349,19 @@ class Knot:
 
             # the k arc becomes the j arc
             for cr, _ in self.getCrossingsBetween(c, kCrossOther, 'k'):
-                self.ijkCrossings[cr]['i'] = j
+                ijkCrossings[cr]['i'] = j
             
             # update the tip of the k arc
-            self.ijkCrossings[kCrossOther]['j'] = j
+            ijkCrossings[kCrossOther]['j'] = j
 
             # update neighbors
             self.ijkCrossingNs[jN][jNInc] = kN # TODO: WORKING HERE
             self.ijkCrossingNs[kN][kNInc] = jN
             self.ijkCrossingNs[i0N][i0NInc] = i1N
             self.ijkCrossingNs[i1N][i1NInc] = i0N
+        
+        # commit local crossing changes
+        self.ijkCrossings = ijkCrossings
 
         # remove crossing
         self.ijkCrossings[c] = None
@@ -395,7 +401,8 @@ if __name__ == "__main__":
         print("neighbors: ")
         for i, c in enumerate(myKnot.ijkCrossingNs):
             print("  {}: {}".format(i, c))
-        print(handedness)
+        print("Handedness: {}".format(myKnot.handedness))
+        print("Unknots: {}".format(myKnot.numUnknots))
 
     print("original: ")
     printStuff()
@@ -403,23 +410,23 @@ if __name__ == "__main__":
     # print(myKnot.getNAndDir(0, 'i1'))
 
     # test smooth crossings
-    smooth = 0
-    myKnot.smoothCrossing(smooth)
-    print("\nAfter smoothing {}".format(smooth))
-    printStuff()
+    # smooth = 0
+    # myKnot.smoothCrossing(smooth)
+    # print("\nAfter smoothing {}".format(smooth))
+    # printStuff()
 
     # test swap crossings
-    # swap = 0
-    # myKnot.swapCrossing(swap)
-    # print("\nAfter swapping {}".format(swap))
-    # printStuff()
+    swap = 0
+    myKnot.swapCrossing(swap)
+    print("\nAfter swapping {}".format(swap))
+    printStuff()
 
-    # print(myKnot.getIncomingDir(0, 'k', 3))
 
-    # remove = 0
-    # myKnot.removeCrossing(remove)
-    # print("After removing {}".format(remove))
-    # printStuff()
+    # test removal
+    remove = 0
+    myKnot.removeCrossing(remove)
+    print("After removing {}".format(remove))
+    printStuff()
 
     # test smooth crossings
     # smooth = 1
