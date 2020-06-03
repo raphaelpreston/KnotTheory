@@ -28,6 +28,7 @@ class KnotHandler(): # TODO: delete self variables for certain steps once they'r
         self.skelImageData = skelImageData
         self.imageWidth = imageData.shape[1]
         self.imageHeight = imageData.shape[0]
+        # self.imageName = imageName
 
         # callback to swap image being displayed from normal to skeleton
         self.swapImgFunc = swapImgFunc
@@ -159,6 +160,7 @@ class KnotHandler(): # TODO: delete self variables for certain steps once they'r
                 print("IJK Crossing Neighbors:")
                 for ind, c in enumerate(ijkCrossingNs):
                     print("{}: {}".format(ind, c))
+                
 
                 print("Handedness")
                 print(handedness)

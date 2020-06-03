@@ -199,6 +199,7 @@ class ArcHandler:
         
         # given a crossing index, return the neighbor crossing in a direction
         # from the given arcType of the crossing, requires sorted self.ijkPoints
+        # also returns direction in which we arrived to the neighbor
         def getCrossingNInDir(crossingIndex, arcType, myDir):
             # get our starting pixel
             iPoint, jEp, kEp = self.ijkPoints[crossingIndex]
@@ -215,17 +216,22 @@ class ArcHandler:
                 currPix = self.knotEnumeration[currPix][myDir]
             # currPix is not some i, j, k pixel of another crossing
             if currPix in jEpToCrossingNum:
-                return jEpToCrossingNum[currPix]
+                return jEpToCrossingNum[currPix], 'j'
             elif currPix in kEpToCrossingNum:
-                return kEpToCrossingNum[currPix]
+                return kEpToCrossingNum[currPix], 'k'
             elif currPix in iPointToCrossingNum:
-                return iPointToCrossingNum[currPix]
+                # i0 and j dirs must arrive at an i1 and i1, k dirs must arrive
+                # at i0 crossings
+                iModified = {'i0': 'i1', 'j': 'i1', 'i1': 'i0', 'k': 'i0'}[arcType]
+                return iPointToCrossingNum[currPix], iModified
         
         # begin process of getting neighbors
         self.ijkCrossingNs = [None for _ in handedness] # {[i: {next, prev}, j: {next, prev}...}
         # travel around again and note all neighbors
         for currCrossing in range(len(self.handedness)):
             # get immediate neighbors from all i, j, k in both directions
+            # and get the way that our crossing arrived to neighbor crossing in that dir
+            
             crossingNs = {
                 # both next and prev for i
                 'i0': getCrossingNInDir(currCrossing, 'i', 'prev'),
@@ -233,6 +239,7 @@ class ArcHandler:
                 'j': getCrossingNInDir(currCrossing, 'j', 'prev'),
                 'k': getCrossingNInDir(currCrossing, 'k', 'next')
             }
+
             self.ijkCrossingNs[currCrossing] = crossingNs
 
 

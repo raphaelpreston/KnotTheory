@@ -35,6 +35,7 @@
  - draw a knot, take a pic, get a link to the knot on knotinfo (this would be the simplest form knot; then show info on the knot diagram itself)
  - https://math.okstate.edu/people/segerman/talks/drawing_knots.pdf
  
+ - currently, every crossing needs to have an i, j, and k. Not implied like an arc jumping over two arcs instead of one.
 
 ## To Connect Endpoints
  - check distance from the endpoints and the intersection (intersection should be relatively equadistant between endpoints)
@@ -43,6 +44,10 @@
  - just go down a rope and check all sides of it for endpoints of other ropes (directionality would still be better)
  - when using first derivative to get slope, get as close as you can do perpendicular against the end boundary of the line
  - intersection likely to be near another line
+
+
+ - has a problem with small arcs for some reason
+ - assumption: i0 and j dirs must arrive at an i1 and i1, k dirs must arrive at i0 crossings
 
 
 - always trying to balance computation on the fly vs computation on changes, like with
