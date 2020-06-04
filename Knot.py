@@ -22,9 +22,9 @@ class Knot:
 
         # first is the crossing where i = k, second is the crossing where i = j
         first = [ ind for ind, crossings in enumerate(self.ijkCrossings)
-                  if crossings['k'] == i]
+                  if crossings and crossings['k'] == i]
         second = [ind for ind, crossings in enumerate(self.ijkCrossings)
-                  if crossings['j'] == i]
+                  if crossings and crossings['j'] == i]
         if len(first) > 1 or len(second) > 1:
             print("Error: Found more than one first/second crossing for i")
             print("Firsts: {}".format(first))
@@ -44,7 +44,7 @@ class Knot:
         myArc = self.ijkCrossings[c][myDir]
         lookingForType = "k" if myDir == "j" else "j"
         otherCrossing = [ind for ind, crossings in enumerate(self.ijkCrossings)
-                         if crossings[lookingForType] == myArc]
+                         if crossings and crossings[lookingForType] == myArc]
         if len(otherCrossing) > 1:
             print("Error: Found more than one crossing for {}".format(myDir))
             return
@@ -52,7 +52,9 @@ class Knot:
 
     # return the crossings & (over, under) of each crossing between
     # crossing1 -> crossing2 in the inDir (i0/1, j, or k) direction
-    def getCrossingsBetween(self, c1, c2, inDir):
+    # enable forceToTip to force the crossing to keep going until it gets to the
+    # end of the arc (incase of a loop around self where you want to go to the end)
+    def getCrossingsBetween(self, c1, c2, inDir, forceToTip=False):
 
         # keep track of crossings inbetween
         crossingsFound = []
@@ -71,18 +73,25 @@ class Knot:
             # record findings and proceed
             myType = "over" if nextDir in ['i0', 'i1'] else "under"
             crossingsFound.append((nextCrossing, myType))
+            print(" - Found {}".format((nextCrossing, myType)))
             currCrossing, currDir = nextCrossing, nextDir
 
             # break if necessary
             if currCrossing == c2:
-                break
+                print(" - Hit c2 {} with dir {}".format(currCrossing, myType))
+                if forceToTip:
+                    if myType == "under": # only break when the arc ends
+                        print("breaking")
+                        break
+                else:
+                    break
         
         # get rid of our destination crossing
         crossingsFound.pop()
+        print("Crossings between {} and {} in {} dir are {}".format(c1, c2, inDir, crossingsFound))
         return crossingsFound
      # return c2's persepective of incoming direction from c1 in outDir to c2
     
-
     def getNAndDir(self, c1, outDir):
         # get neighbor
         n = self.ijkCrossingNs[c1][outDir]
@@ -91,10 +100,11 @@ class Knot:
 
     # function to return the c1s dir from c2s perspective
     def getIncomingDir(self, c1, outDir, c2):
+
         # error check
         if self.ijkCrossingNs[c1][outDir] != c2:
             print("Error: C1 -> outdir didn't lead to C2")
-            return
+            return None
         
         # get the crossings of the i arc, and the other points on j and ks arcs
         iCross0, iCross1 = self.getOrderedICrossings(c1)
@@ -107,13 +117,36 @@ class Knot:
         jN = self.ijkCrossingNs[c1]['j']
         kN = self.ijkCrossingNs[c1]['k']
 
-        # return necessary
-        return {
-            'i0': 'k' if iCross0 == i0N else 'i1',
-            'i1': 'j' if iCross1 == i1N else 'i0',
-            'j': 'k' if jCrossOther == jN else 'i1',
-            'k': 'j' if kCrossOther == kN else 'i0'
-        }[outDir]
+        # intuition is that we can figure out what the incoming direction has to
+        # be based on whether or not the other end of the arc is our neighbor
+
+        # special case where c2 is c1's neighbor, incoming on i0/i1, but the i arc
+        # loops around back into this crossing, meaning that c2 crossing is
+        # technically the end of the arc. we know this is the case if the neighbor
+        # of the current crossing in the i1 direction is itself. if the next crossing
+        # were anything else, then we would be sure that this wouldn't be the case.
+        # TODO: prove this
+
+        # we need to check c1 != c2 to make sure that we don't get stuck in a loop
+        if self.ijkCrossingNs[c2]['i1'] == c2 and c1 != c2:
+            # impossible for the i1 neighbor to be itself and NOT loop back onto
+            # self
+            print("special case 1")
+            v = 'i0' if c1 != c2 else "j"
+        elif self.ijkCrossingNs[c2]['i0'] == c2 and c1 != c2:
+            v = 'i1'
+            print("special case 2")
+        else:
+            # return necessary
+            v = {
+                'i0': 'k' if iCross0 == i0N else 'i1',
+                'i1': 'j' if iCross1 == i1N else 'i0',
+                'j': 'k' if jCrossOther == jN else 'i1',
+                'k': 'j' if kCrossOther == kN else 'i0'
+            }[outDir]
+
+        print("The incoming dir from {} -{}-> {} is {}".format(c1, outDir, c2, v))
+        return v
 
     # swap handedness of a given crossing in-place
     def swapCrossing(self, crossingIndex):
@@ -256,7 +289,7 @@ class Knot:
                     dirToSearch = {"j": "i1", "k": "i0"}[jOrK]
                     
                     # shortcut to get crossings between. can't call using crossing
-                    # twice because incDir won't work on crossing.
+                    # twice because incDir won't work on crossing. < dunno bout this anymore
                     between = self.getCrossingsBetween(crossing, jOrKN, dirToSearch)
 
                     return (crossing,
@@ -337,6 +370,7 @@ class Knot:
         
         # save ijkCrossing changes locally so getCrossingsBetween works
         ijkCrossings = copy.deepcopy(self.ijkCrossings)
+        ijkCrossingNs = copy.deepcopy(self.ijkCrossingNs)
 
         # this crossing could be the only one left on its knot
         if all([n == jN for n in [i1N, i0N, kN]]):
@@ -348,20 +382,48 @@ class Knot:
             kCrossOther = self.getOtherJKCrossing(c, 'k')
 
             # the k arc becomes the j arc
-            for cr, _ in self.getCrossingsBetween(c, kCrossOther, 'k'):
+            for cr, _ in self.getCrossingsBetween(c, kCrossOther, 'k', forceToTip=True):
                 ijkCrossings[cr]['i'] = j
-            
+
             # update the tip of the k arc
             ijkCrossings[kCrossOther]['j'] = j
 
-            # update neighbors
-            self.ijkCrossingNs[jN][jNInc] = kN # TODO: WORKING HERE
-            self.ijkCrossingNs[kN][kNInc] = jN
-            self.ijkCrossingNs[i0N][i0NInc] = i1N
-            self.ijkCrossingNs[i1N][i1NInc] = i0N
+            # at any step, if we are setting a neighbor's neighbor to be c (which
+            # we are removing), there must be a loop around c in some direction
+            # and we need to instead set it to be the NEXT neighbor after the loop
+
+            # update neighbors and get the next neighbors after the loop if necessary
+            if kN == c:
+                ijkCrossingNs[jN][jNInc] = self.ijkCrossingNs[c]['i1']
+                print("0: Setting crossingNs[{}][{}] = {}".format(jN, jNInc, self.ijkCrossingNs[c]['i1']))
+            else:
+                ijkCrossingNs[jN][jNInc] = kN
+                print("0: Setting crossingNs[{}][{}] = {}".format(jN, jNInc, kN))
+            
+            if jN == c:
+                ijkCrossingNs[kN][kNInc] = self.ijkCrossingNs[c]['i0']
+                print("1: Setting crossingNs[{}][{}] = {}".format(kN, kNInc, self.ijkCrossingNs[jN]['i0']))
+            else:
+                ijkCrossingNs[kN][kNInc] = jN
+                print("1: Setting crossingNs[{}][{}] = {}".format(kN, kNInc, jN))
+            
+            if i1N == c:
+                ijkCrossingNs[i0N][i0NInc] = self.ijkCrossingNs[c]['k']
+                print("2: Setting crossingNs[{}][{}] = {}".format(i0N, i0NInc, self.ijkCrossingNs[c]['k']))
+            else:
+                ijkCrossingNs[i0N][i0NInc] = i1N
+                print("2: Setting crossingNs[{}][{}] = {}".format(i0N, i0NInc, i1N))
+            
+            if i0N == c:
+                ijkCrossingNs[i1N][i1NInc] = self.ijkCrossingNs[c]['j']
+                print("3: Setting crossingNs[{}][{}] = {}".format(i1N, i1NInc, self.ijkCrossingNs[c]['j']))
+            else:
+                ijkCrossingNs[i1N][i1NInc] = i0N
+                print("3: Setting crossingNs[{}][{}] = {}".format(i1N, i1NInc, i0N))
         
-        # commit local crossing changes
+        # commit local crossing and neighbor changes
         self.ijkCrossings = ijkCrossings
+        self.ijkCrossingNs = ijkCrossingNs
 
         # remove crossing
         self.ijkCrossings[c] = None
@@ -424,6 +486,18 @@ if __name__ == "__main__":
 
     # test removal
     remove = 0
+    myKnot.removeCrossing(remove)
+    print("After removing {}".format(remove))
+    printStuff()
+
+    # test removal
+    remove = 2
+    myKnot.removeCrossing(remove)
+    print("After removing {}".format(remove))
+    printStuff()
+
+    # test removal
+    remove = 1
     myKnot.removeCrossing(remove)
     print("After removing {}".format(remove))
     printStuff()

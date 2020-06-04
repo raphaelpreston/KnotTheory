@@ -65,6 +65,8 @@ keeping arc neighbors would do this too.
 - tough to figure out incoming dir for unknots or loops, there is background that you need about knots
 - propogate crossing change function?
 
+- a lot of problems actually arise when dealing with a twisted unknot
+
 ## Credit:
 # StackOverflow
  - 
