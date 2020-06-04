@@ -73,15 +73,12 @@ class Knot:
             # record findings and proceed
             myType = "over" if nextDir in ['i0', 'i1'] else "under"
             crossingsFound.append((nextCrossing, myType))
-            print(" - Found {}".format((nextCrossing, myType)))
             currCrossing, currDir = nextCrossing, nextDir
 
             # break if necessary
             if currCrossing == c2:
-                print(" - Hit c2 {} with dir {}".format(currCrossing, myType))
                 if forceToTip:
                     if myType == "under": # only break when the arc ends
-                        print("breaking")
                         break
                 else:
                     break
@@ -146,7 +143,6 @@ class Knot:
                 'k': 'j' if kCrossOther == kN else 'i0'
             }[outDir]
 
-        print("The incoming dir from {} -{}-> {} is {}".format(c1, outDir, c2, v))
         return v
 
     # swap handedness of a given crossing in-place
@@ -154,6 +150,8 @@ class Knot:
         i = self.ijkCrossings[crossingIndex]['i']
         j = self.ijkCrossings[crossingIndex]['j']
         k = self.ijkCrossings[crossingIndex]['k']
+        myNs = self.ijkCrossingNs[crossingIndex]
+        jN, kN, i0N, i1N = myNs['j'], myNs['k'], myNs['i0'], myNs['i1']
 
         # get the crossings of the i arc, and the other points on j and ks arcs
         iCross0, _ = self.getOrderedICrossings(crossingIndex)
@@ -164,45 +162,63 @@ class Knot:
         # but don't need to know the crossings between i and iCross1.
         # the crossings between inherently are crossings where the arc is i
         i0CrossingsAsI = [ # only care about crossing numbers
-            c for c, _ in self.getCrossingsBetween(crossingIndex, iCross0, 'i0')
+            c for c, _ in self.getCrossingsBetween(crossingIndex, iCross0, 'i0', forceToTip=True)
         ]
         kCrossingsAsI = [
-            c for c, _ in self.getCrossingsBetween(crossingIndex, kCrossOther, 'k')
+            c for c, _ in self.getCrossingsBetween(crossingIndex, kCrossOther, 'k', forceToTip=True)
         ]
         
-        # from crossing -> iCross1 stays i's old arcNum, but it's the new k
-        newK = i
-        # all crossings between crossing -> iCross1 stay constant
+        # special cases where we are swapping a loop
+        if i1N == crossingIndex:
+            newK, newI = k, k
+            print("Assigning newK and newI the value of k ({})".format(k))
 
-        # the new arc formed from iCross0 to crossing steals k's arcNum since
-        # k's arcNum will be engulfed by j
-        newJ = k
+            newJ = i
+            print("Assigning newJ the value of i ({})".format(i))
+        elif i0N == crossingIndex:
+            newJ, newI = j, j
+            print("Assigning newJ and newI the value of j ({})".format(j))
 
-        # update all crossings inbetween crossing and iCross0
-        for c in i0CrossingsAsI:
-            self.ijkCrossings[c]['i'] = k
-        
-        # change the value at iCross0 too
-        self.ijkCrossings[iCross0]['k'] = k
+            newK = i
+            print("Assigning newI the value of k ({})".format(k))
+        else: # not a loop
+            # from crossing -> iCross1 stays i's old arcNum, but it's the new k
+            newK = i
+            print("Assigning newK the value of i ({})".format(i))
+            # all crossings between crossing -> iCross1 stay constant
 
-        # j's arcNum extends into k to become the new i
-        newI = j
+            # the new arc formed from iCross0 to crossing steals k's arcNum since
+            # k's arcNum will be engulfed by j
+            newJ = k
+            print("Assigning newJ the value of k ({})".format(k))
 
-        # update crossings between crossing and other tip of k
-        for c in kCrossingsAsI:
-            self.ijkCrossings[c]['i'] = j
+            # update all crossings inbetween crossing and iCross0
+            for c in i0CrossingsAsI:
+                self.ijkCrossings[c]['i'] = k
+                print("Updated {}'s i to {}".format(c, k))
+            
+            # change the value at iCross0 too
+            self.ijkCrossings[iCross0]['k'] = k
+            print("Updated k tip of iCross0 ({}) to k ({})".format(iCross0, self.ijkCrossings[iCross0]))
 
-        # update the value at tip of k
-        self.ijkCrossings[kCrossOther]['j'] = j
+            # j's arcNum extends into k to become the new i
+            newI = j
+            print("Assigned newI to b j ({})".format(j))
 
-        # the i's on crossings between crossing and other tip of j stay constant
-        # as well as the tip of j
+            # update crossings between crossing and other tip of k
+            for c in kCrossingsAsI:
+                self.ijkCrossings[c]['i'] = j
+                print("Updated {}'s i to {}".format(c, j))
+
+            # update the value at tip of k
+            self.ijkCrossings[kCrossOther]['j'] = j
+            print("Updated j tip of kCrossOther ({}) to j ({})".format(kCrossOther, j))
+
+            # the i's on crossings between crossing and other tip of j stay constant
+            # as well as the tip of j
 
         # update the neighbors
-        myNs = self.ijkCrossingNs[crossingIndex]
-        myNs['i0'], myNs['i1'], myNs['j'], myNs['k'] = (
-            myNs['j'], myNs['k'], myNs['i0'], myNs['i1']
-        )
+        myNs['i0'], myNs['i1'], myNs['j'], myNs['k'] = jN, kN, i0N, i1N
 
         # replace our crossing with the new values
         self.ijkCrossings[crossingIndex] = {'i': newI, 'j': newJ, 'k': newK}
@@ -482,7 +498,6 @@ if __name__ == "__main__":
     print("\nAfter swapping {}".format(swap))
     printStuff()
 
-
     # test removal
     remove = 0
     myKnot.removeCrossing(remove)
@@ -495,17 +510,29 @@ if __name__ == "__main__":
     print("After removing {}".format(remove))
     printStuff()
 
-    # test removal
-    remove = 1
-    myKnot.removeCrossing(remove)
-    print("After removing {}".format(remove))
+    # test swap crossings
+    swap = 1
+    myKnot.swapCrossing(swap)
+    print("\nAfter swapping {}".format(swap))
     printStuff()
 
-    # test removal
-    remove = 3
-    myKnot.removeCrossing(remove)
-    print("After removing {}".format(remove))
+    # test swap crossings
+    swap = 1
+    myKnot.swapCrossing(swap)
+    print("\nAfter swapping {}".format(swap))
     printStuff()
+
+    # # test removal
+    # remove = 1
+    # myKnot.removeCrossing(remove)
+    # print("After removing {}".format(remove))
+    # printStuff()
+
+    # # test removal
+    # remove = 3
+    # myKnot.removeCrossing(remove)
+    # print("After removing {}".format(remove))
+    # printStuff()
 
     # test smooth crossings
     # smooth = 1
