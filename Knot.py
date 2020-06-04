@@ -277,6 +277,12 @@ class Knot:
         self.ijkCrossingNs[c] = None
         self.handedness[c] = None
 
+        # special case where we've removed all crossings except one
+        if len([c for c in self.ijkCrossings if c is not None]) == 1:
+            ind = [i for i, c in enumerate(self.ijkCrossings) if c is not None][0]
+            # set all i, j, k to be itself
+            self.ijkCrossings[ind] = {'i': ind, 'j': ind, 'k': ind}
+
         # incease the number of unknots
         self.numUnknots += numUnknotsMade
 
@@ -492,6 +498,12 @@ if __name__ == "__main__":
 
     # test smooth crossings
     smooth = 1
+    myKnot.smoothCrossing(smooth)
+    print("\nAfter smoothing {}".format(smooth))
+    printStuff()
+
+    # test smooth crossings
+    smooth = 3
     myKnot.smoothCrossing(smooth)
     print("\nAfter smoothing {}".format(smooth))
     printStuff()
