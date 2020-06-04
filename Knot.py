@@ -147,6 +147,10 @@ class Knot:
 
     # swap handedness of a given crossing in-place
     def swapCrossing(self, crossingIndex):
+        if crossingIndex is None:
+            print("Error: Can't swap a crossing that's already removed")
+            return
+
         i = self.ijkCrossings[crossingIndex]['i']
         j = self.ijkCrossings[crossingIndex]['j']
         k = self.ijkCrossings[crossingIndex]['k']
@@ -228,6 +232,10 @@ class Knot:
 
     # smooth a given crossing in-place, could increase self.numUnknots
     def smoothCrossing(self, c):
+        if c is None:
+            print("Error: Can't smooth a crossing that's already removed")
+            return
+        
         # get all info needed
         i = self.ijkCrossings[c]['i']
         j = self.ijkCrossings[c]['j']
@@ -291,7 +299,7 @@ class Knot:
     # that appears twice
     def getR1Crossing(self):
         # first ensure there aren't trivially R1 crossings with the same arc
-        # entering the crossing twice. also, existence will break code below
+        # entering the crossing twice. also, existence will break code further down
         for crossing in range(len(self.ijkCrossings)):
             ijk = self.ijkCrossings[crossing]
             if ijk is not None:
@@ -306,6 +314,10 @@ class Knot:
 
                     # get neighbor in that direction and record it
                     jOrKN, _ = self.ijkCrossingNs[crossing][jOrK]
+
+                    # skip looking if it's a trivial loop
+                    if jOrKN == crossing:
+                        return (crossing, [], "over")
 
                     # loop goes in i1 direction or i0 direction depending
                     dirToSearch = {"j": "i1", "k": "i0"}[jOrK]
@@ -489,35 +501,41 @@ if __name__ == "__main__":
     print("original: ")
     printStuff()
 
-    # # test smooth crossings
-    # smooth = 0
-    # myKnot.smoothCrossing(smooth)
-    # print("\nAfter smoothing {}".format(smooth))
+    # test smooth crossings
+    smooth = 0
+    myKnot.smoothCrossing(smooth)
+    print("\nAfter smoothing {}".format(smooth))
+    printStuff()
+
+    # test smooth crossings
+    smooth = 0
+    myKnot.smoothCrossing(smooth)
+    print("\nAfter smoothing {}".format(smooth))
+    printStuff()
+
+    # # test swap crossings
+    # swap = 0
+    # myKnot.swapCrossing(swap)
+    # print("\nAfter swapping {}".format(swap))
     # printStuff()
 
-    # test swap crossings
-    swap = 0
-    myKnot.swapCrossing(swap)
-    print("\nAfter swapping {}".format(swap))
-    printStuff()
+    # # test removal
+    # remove = 0
+    # myKnot.removeCrossing(remove)
+    # print("After removing {}".format(remove))
+    # printStuff()
 
-    # test removal
-    remove = 0
-    myKnot.removeCrossing(remove)
-    print("After removing {}".format(remove))
-    printStuff()
+    # # test removal
+    # remove = 2
+    # myKnot.removeCrossing(remove)
+    # print("After removing {}".format(remove))
+    # printStuff()
 
-    # test removal
-    remove = 2
-    myKnot.removeCrossing(remove)
-    print("After removing {}".format(remove))
-    printStuff()
-
-    # test removal
-    remove = 1
-    myKnot.removeCrossing(remove)
-    print("After removing {}".format(remove))
-    printStuff()
+    # # test removal
+    # remove = 1
+    # myKnot.removeCrossing(remove)
+    # print("After removing {}".format(remove))
+    # printStuff()
 
     # test removal
     # remove = 3
@@ -526,10 +544,10 @@ if __name__ == "__main__":
     # printStuff()
 
     # test smooth crossings
-    smooth = 3
-    myKnot.smoothCrossing(smooth)
-    print("\nAfter smoothing {}".format(smooth))
-    printStuff()
+    # smooth = 3
+    # myKnot.smoothCrossing(smooth)
+    # print("\nAfter smoothing {}".format(smooth))
+    # printStuff()
 
     # test R1 reduction
     # print()
