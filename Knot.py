@@ -242,28 +242,33 @@ class Knot:
         jCrossOther = self.getOtherJKCrossing(c, 'j')
         kCrossOther = self.getOtherJKCrossing(c, 'k')
 
-        # have to save changes locally and then commit them after all changes for
-        # incoming direction to work in getCrossingsBetween
-        ijkCrossings = copy.deepcopy(self.ijkCrossings)
+        # get relevent crossings inbetween crossings
+        kCrossingsAsI = self.getCrossingsBetween(c, kCrossOther, 'k', forceToTip=True)
+        i1CrossingsAsI = self.getCrossingsBetween(c, iCross1, 'i1', forceToTip=True)
+
+        # check for number of unknots to be made
+        if i0N == c and i1N == c:
+            numUnknotsMade = 2
+        elif i0N == c or i1N == c:
+            numUnknotsMade = 1
+        else:
+            numUnknotsMade = 0
 
         # k arc becomes i
         # update the crossings on k
-        for cBetween, _ in self.getCrossingsBetween(c, kCrossOther, 'k'):
-            ijkCrossings[cBetween]['i'] = i
+        for cBetween, _ in kCrossingsAsI:
+            self.ijkCrossings[cBetween]['i'] = i
         
         # update the other end of k
-        ijkCrossings[kCrossOther]['j'] = i
+        self.ijkCrossings[kCrossOther]['j'] = i
 
         # i1 arc becomes j
         # update the crossings on i1
-        for cBetween, _ in self.getCrossingsBetween(c, iCross1, 'i1'):
-            ijkCrossings[cBetween]['i'] = j
+        for cBetween, _ in i1CrossingsAsI:
+            self.ijkCrossings[cBetween]['i'] = j
 
         # update the other end of i1
-        ijkCrossings[iCross1]['j'] = j
-
-        # commit ijkCrossing after all changes have been made
-        self.ijkCrossings = ijkCrossings
+        self.ijkCrossings[iCross1]['j'] = j
 
         # connect neighbors between jN -> i1 curve
         self.ijkCrossingNs[jN][jNIncDir] = i1N
@@ -273,13 +278,13 @@ class Knot:
         self.ijkCrossingNs[i0N][i0NIncDir] = kN
         self.ijkCrossingNs[kN][kNIncDir] = i0N
 
-        # determine if we've just made an uknot
-        print("Before deleting:")
-
         # remove crossing from ijkCrossings, and handedness
         self.ijkCrossings[c] = None
         self.ijkCrossingNs[c] = None
         self.handedness[c] = None
+
+        # incease the number of unknots
+        self.numUnknots += numUnknotsMade
 
     # return an R1 crossing and the crossings between it, or None if none exist.
     # guaranteed to not return a crossing in a direction with a path with a vertex
@@ -445,9 +450,9 @@ class Knot:
         self.ijkCrossingNs[c] = None
         self.handedness[c] = None
 
+
+
 if __name__ == "__main__":
-
-
     # figure 8 knot for testing
     ijkCrossings = [
         {'i': 2, 'j': 3, 'k': 0},
@@ -484,9 +489,7 @@ if __name__ == "__main__":
     print("original: ")
     printStuff()
 
-    # print(myKnot.getNAndDir(0, 'i1'))
-
-    # test smooth crossings
+    # # test smooth crossings
     # smooth = 0
     # myKnot.smoothCrossing(smooth)
     # print("\nAfter smoothing {}".format(smooth))
@@ -510,36 +513,23 @@ if __name__ == "__main__":
     print("After removing {}".format(remove))
     printStuff()
 
-    # test swap crossings
-    swap = 1
-    myKnot.swapCrossing(swap)
-    print("\nAfter swapping {}".format(swap))
+    # test removal
+    remove = 1
+    myKnot.removeCrossing(remove)
+    print("After removing {}".format(remove))
     printStuff()
 
-    # test swap crossings
-    swap = 1
-    myKnot.swapCrossing(swap)
-    print("\nAfter swapping {}".format(swap))
-    printStuff()
-
-    # # test removal
-    # remove = 1
-    # myKnot.removeCrossing(remove)
-    # print("After removing {}".format(remove))
-    # printStuff()
-
-    # # test removal
+    # test removal
     # remove = 3
     # myKnot.removeCrossing(remove)
     # print("After removing {}".format(remove))
     # printStuff()
 
     # test smooth crossings
-    # smooth = 1
-    # myKnot.smoothCrossing(smooth)
-
-    # print("\nAfter smoothing {}".format(smooth))
-    # printStuff()
+    smooth = 3
+    myKnot.smoothCrossing(smooth)
+    print("\nAfter smoothing {}".format(smooth))
+    printStuff()
 
     # test R1 reduction
     # print()
