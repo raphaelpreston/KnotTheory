@@ -128,16 +128,17 @@ class Knot:
         # TODO: prove this
 
         # we need to check c1 != c2 to make sure that we don't get stuck in a loop
-        if self.ijkCrossingNs[c2]['i1'] == c2 and c1 != c2:
-            # impossible for the i1 neighbor to be itself and NOT loop back onto
-            # self
-            print("special case 1")
-            v = 'i0' if c1 != c2 else "j"
+        if self.ijkCrossingNs[c2]['i1'] == c2 and c1 != c2: # must loop
+            modDir = {'i0': 'i', 'i1': 'i', 'j': 'j', 'k': 'k'}[outDir]
+            if self.ijkCrossings[c1][modDir] == self.ijkCrossings[c2]['i']:
+                # there are at least two crossings, so we know we arrived on i
+                # if this is true
+                v = {'i1': 'i0', 'k': 'i0', 'i0': 'i1', 'j': 'i1'}[outDir]
+            else: # we arrived on j or k
+                v = {'i1': 'j', 'k': 'j', 'i0': 'k', 'j': 'k'}[outDir]
         elif self.ijkCrossingNs[c2]['i0'] == c2 and c1 != c2:
             v = 'i1'
-            print("special case 2")
-        else:
-            # return necessary
+        else: # no loop
             v = {
                 'i0': 'k' if iCross0 == i0N else 'i1',
                 'i1': 'j' if iCross1 == i1N else 'i0',
@@ -360,6 +361,9 @@ class Knot:
     def removeCrossing(self, c):
         # get the arcs
         crossing = self.ijkCrossings[c]
+        if crossing is None:
+            print("Error: Can't remove a crossing that's already removed")
+            return
         i, j, k = crossing['i'], crossing['j'], crossing['k']
 
         # get neighbors and their incoming directions from c into given neighbor
@@ -393,31 +397,26 @@ class Knot:
             # and we need to instead set it to be the NEXT neighbor after the loop
 
             # update neighbors and get the next neighbors after the loop if necessary
-            if kN == c:
-                ijkCrossingNs[jN][jNInc] = self.ijkCrossingNs[c]['i1']
-                print("0: Setting crossingNs[{}][{}] = {}".format(jN, jNInc, self.ijkCrossingNs[c]['i1']))
-            else:
-                ijkCrossingNs[jN][jNInc] = kN
-                print("0: Setting crossingNs[{}][{}] = {}".format(jN, jNInc, kN))
-            
-            if jN == c:
-                ijkCrossingNs[kN][kNInc] = self.ijkCrossingNs[c]['i0']
-                print("1: Setting crossingNs[{}][{}] = {}".format(kN, kNInc, self.ijkCrossingNs[jN]['i0']))
-            else:
-                ijkCrossingNs[kN][kNInc] = jN
-                print("1: Setting crossingNs[{}][{}] = {}".format(kN, kNInc, jN))
             
             if i1N == c:
+                print("kN: {}".format(kN))
+                print("kNInc: {}".format(kNInc))
+                print("i0N: {}".format(i0N))
+                print("i0NInc: {}".format(i0NInc))
+                ijkCrossingNs[kN][kNInc] = self.ijkCrossingNs[c]['i0']
+                print("Setting {}'s {} neighbor to {}".format(kN, kNInc, self.ijkCrossingNs[c]['i0']))
                 ijkCrossingNs[i0N][i0NInc] = self.ijkCrossingNs[c]['k']
-                print("2: Setting crossingNs[{}][{}] = {}".format(i0N, i0NInc, self.ijkCrossingNs[c]['k']))
-            else:
+                print("Setting {}'s {} neighbor to {}".format(i0N, i0NInc, self.ijkCrossingNs[c]['k']))
+            elif i0N == c:
+                ijkCrossingNs[jN][jNInc] = self.ijkCrossingNs[c]['i1']
+                ijkCrossingNs[i1N][i1NInc] = self.ijkCrossingNs[c]['j']
+            else: # no loop
+                ijkCrossingNs[jN][jNInc] = kN
+                print("0: Setting crossingNs[{}][{}] = {}".format(jN, jNInc, kN))
+                ijkCrossingNs[kN][kNInc] = jN
+                print("1: Setting crossingNs[{}][{}] = {}".format(kN, kNInc, jN))
                 ijkCrossingNs[i0N][i0NInc] = i1N
                 print("2: Setting crossingNs[{}][{}] = {}".format(i0N, i0NInc, i1N))
-            
-            if i0N == c:
-                ijkCrossingNs[i1N][i1NInc] = self.ijkCrossingNs[c]['j']
-                print("3: Setting crossingNs[{}][{}] = {}".format(i1N, i1NInc, self.ijkCrossingNs[c]['j']))
-            else:
                 ijkCrossingNs[i1N][i1NInc] = i0N
                 print("3: Setting crossingNs[{}][{}] = {}".format(i1N, i1NInc, i0N))
         
@@ -498,6 +497,12 @@ if __name__ == "__main__":
 
     # test removal
     remove = 1
+    myKnot.removeCrossing(remove)
+    print("After removing {}".format(remove))
+    printStuff()
+
+    # test removal
+    remove = 3
     myKnot.removeCrossing(remove)
     print("After removing {}".format(remove))
     printStuff()
