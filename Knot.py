@@ -30,17 +30,25 @@ class Knot:
     
     # return the neighbor in a direction from c, and the incoming direction on said neighbor
     def getNAndDir(self, c, myDir):
+        print("getNAndDir({}, {})".format(c, myDir))
         # get arcNum in that direction
         myArc = self.ijkCrossings[c][myDir]
+
+        print("my arc: {}".format(myArc))
 
         # get all crossings that share the arc
         crossingsOnArc = [
             cr for cr, cData in enumerate(self.ijkCrossings) if 
-            any([arc == myArc for _, arc in cData.items()])
+            cData is not None and any([arc == myArc for _, arc in cData.items()])
         ]
 
-        # guaranteed to have two crossings per arc
-        n = [cr for cr in crossingsOnArc if cr != c][0]
+        print("Crossings on arc: {}".format(crossingsOnArc))
+
+        # get the neighbor
+        if len(crossingsOnArc) == 1: # single loop back to self
+            n = crossingsOnArc[0]
+        else: 
+            n = [cr for cr in crossingsOnArc if cr != c][0]
 
         # get the incoming direction on that crossing
         incDir = [myDir for myDir, arc in self.ijkCrossings[n].items() if arc == myArc][0]
@@ -58,11 +66,13 @@ class Knot:
 
         # keep going until we hit our destination crossing
         currCrossing = c1
-        currDir = inDir # i0, i1, j, or k
+        currDir = inDir
         while True: # want to go at least once
+
 
             # get the next crossing in direction and how it arrives to neighbor
             nextCrossing, incDir = self.getNAndDir(currCrossing, currDir)
+            print("Continuing from {}, {} in {}, {}".format(currCrossing, currDir, nextCrossing, incDir))
             
             # figure out in which direction to continue searching
             nextDir = {'i0': 'i1', 'i1': 'i0', 'j': 'k', 'k': 'j'}[incDir]
@@ -83,7 +93,6 @@ class Knot:
         # get rid of our destination crossing
         crossingsFound.pop()
         return crossingsFound
-     # return c2's persepective of incoming direction from c1 in outDir to c2
 
     # update a crossing with given dirs and crossings in newCrossings
     # propogate the change the neighbors as well
@@ -164,60 +173,80 @@ class Knot:
         # increase the number of unknots
         self.numUnknots += numSameArcs
 
-
     # return an R1 crossing and the crossings between it, or None if none exist.
     # guaranteed to not return a crossing in a direction with a path with a vertex
     # that appears twice
     def getR1Crossing(self):
-        # first ensure there aren't trivially R1 crossings with the same arc
-        # entering the crossing twice. also, existence will break code further down
-        for crossing in range(len(self.ijkCrossings)):
-            ijk = self.ijkCrossings[crossing]
-            if ijk is not None:
-                arcs = list(ijk.values())
-                # see if any arc appears twice in a crossing
-                doubleArcList = [a for a in arcs if arcs.count(a) > 1]
-                if doubleArcList:
-
-                    # get the dirs for the double arc. must be i, j or i, k
-                    dirsForArc = [myDir for myDir, _ in ijk.items() if ijk[myDir] == doubleArcList[0]]
-                    jOrK = sorted(dirsForArc)[1]
-
-                    # get neighbor in that direction and record it
-                    jOrKN = self.ijkCrossingNs[crossing][jOrK]
-
-                    # loop goes in i1 direction or i0 direction depending
-                    dirToSearch = {"j": "i1", "k": "i0"}[jOrK]
-
-                    # skip looking if it's a trivial loop
-                    if jOrKN == crossing:
-                        return (crossing, [], dirToSearch, "over")
-
-                    # shortcut to get crossings between. can't call using crossing
-                    # twice because incDir won't work on crossing. < dunno bout this anymore
-                    between = self.getCrossingsBetween(crossing, jOrKN, dirToSearch)
-                    csBetween = [c for c, _ in between] + [jOrKN]
-                    
-                    # special case to detect a link - can't reduce a link
-                    if len(csBetween) != 1:
-                        return (crossing, csBetween, dirToSearch, "over")
-
-        # then, all crossings between a given crossing need to be "under"
-        for crossing in range(len(self.ijkCrossings)):
-            ijk = self.ijkCrossings[crossing]
-            if ijk is not None:
+        
+        # check each crossing
+        for c in range(len(self.ijkCrossings)):
+            if self.ijkCrossings[c] is not None:
                 for myDir in ['i0', 'i1']: # try both directions
-                    between = self.getCrossingsBetween(crossing, crossing, myDir)
-                    if all([myType == "under" for _, myType in between]):
-                        # special case to detect a link - can't reduce a link
-                        if len(csBetween) != 1:
+                    print("self.getCrossingsBetween({}, {}, {})\n".format(c, c, myDir))
+                    betweens = self.getCrossingsBetween(c, c, myDir)
+                    if len(betweens) != 1: # special case - can't reduce a link
+                        # test if they're all over or all under
+                        allOver = all([myType == "over" for _, myType in betweens])
+                        allUnder = all([myType == "under" for _, myType in betweens])
+                        if allOver or allUnder:
                             return (
-                                crossing, 
-                                [c for c, _ in between], # only care about crossings
+                                c, 
+                                [cr for cr, _ in betweens], # return crossings
                                 myDir,
-                                "under"
+                                "over" if allOver else "under"
                             )
         return None, None, None, None
+
+        
+        # # first ensure there aren't trivially R1 crossings with the same arc
+        # # entering the crossing twice. also, existence will break code further down
+        # for crossing in range(len(self.ijkCrossings)):
+        #     ijk = self.ijkCrossings[crossing]
+        #     if ijk is not None:
+        #         arcs = list(ijk.values())
+        #         # see if any arc appears twice in a crossing
+        #         doubleArcList = [a for a in arcs if arcs.count(a) > 1]
+        #         if doubleArcList:
+
+        #             # get the dirs for the double arc. must be i, j or i, k
+        #             dirsForArc = [myDir for myDir, _ in ijk.items() if ijk[myDir] == doubleArcList[0]]
+        #             jOrK = sorted(dirsForArc)[1]
+
+        #             # get neighbor in that direction and record it
+        #             jOrKN = self.ijkCrossingNs[crossing][jOrK]
+
+        #             # loop goes in i1 direction or i0 direction depending
+        #             dirToSearch = {"j": "i1", "k": "i0"}[jOrK]
+
+        #             # skip looking if it's a trivial loop
+        #             if jOrKN == crossing:
+        #                 return (crossing, [], dirToSearch, "over")
+
+        #             # shortcut to get crossings between. can't call using crossing
+        #             # twice because incDir won't work on crossing. < dunno bout this anymore
+        #             between = self.getCrossingsBetween(crossing, jOrKN, dirToSearch)
+        #             csBetween = [c for c, _ in between] + [jOrKN]
+                    
+        #             # special case to detect a link - can't reduce a link
+        #             if len(csBetween) != 1:
+        #                 return (crossing, csBetween, dirToSearch, "over")
+
+        # # then, all crossings between a given crossing need to be "under"
+        # for crossing in range(len(self.ijkCrossings)):
+        #     ijk = self.ijkCrossings[crossing]
+        #     if ijk is not None:
+        #         for myDir in ['i0', 'i1']: # try both directions
+        #             between = self.getCrossingsBetween(crossing, crossing, myDir)
+        #             if all([myType == "under" for _, myType in between]):
+        #                 # special case to detect a link - can't reduce a link
+        #                 if len(csBetween) != 1:
+        #                     return (
+        #                         crossing, 
+        #                         [c for c, _ in between], # only care about crossings
+        #                         myDir,
+        #                         "under"
+        #                     )
+        # return None, None, None, None
 
     # repeatedly reduces all R1 crossings until there are none left
     def reduceR1s(self, numReductions=float("inf")):
@@ -390,12 +419,6 @@ if __name__ == "__main__":
         {'i0': 7, 'i1': 0, 'j': 2, 'k': 3},
         {'i0': 1, 'i1': 2, 'j': 4, 'k': 5},
     ]
-    # ijkCrossingNs = [
-    #     {'i0': 2, 'i1': 3, 'j': 1, 'k': 2},
-    #     {'i0': 3, 'i1': 0, 'j': 2, 'k': 3},
-    #     {'i0': 0, 'i1': 1, 'j': 3, 'k': 0},
-    #     {'i0': 1, 'i1': 2, 'j': 0, 'k': 1}
-    # ]
     handedness = ['left', 'right', 'left', 'right']
 
     myKnot = Knot(ijkCrossings, handedness)
@@ -403,7 +426,8 @@ if __name__ == "__main__":
     print("original: ")
     print(myKnot)
 
-    # swap
+
+    # # swap
     # swap = 0
     # myKnot.swapCrossing(swap)
     # print("\nAfter swapping {}".format(swap))
@@ -415,7 +439,8 @@ if __name__ == "__main__":
     print("\nAfter smoothing {}".format(smooth))
     print(myKnot)
 
-    # print(myKnot.getNAndDir(0, 'i1'))
+    print(myKnot.getR1Crossing())
+
 
     
 
