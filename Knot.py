@@ -43,7 +43,7 @@ class Knot:
         n = [cr for cr in crossingsOnArc if cr != c][0]
 
         # get the incoming direction on that crossing
-        incDir = [myDir for myDir, arc in self.ijkCrossings[n].items() if arc == myArc]
+        incDir = [myDir for myDir, arc in self.ijkCrossings[n].items() if arc == myArc][0]
 
         return n, incDir
 
@@ -86,10 +86,17 @@ class Knot:
      # return c2's persepective of incoming direction from c1 in outDir to c2
 
     # update a crossing with given dirs and crossings in newCrossings
+    # propogate the change the neighbors as well
     def updateCrossing(self, c, newCrossings):
-        # for each dir supplied, update self and propogate change
         for myDir, newArc in newCrossings.items():
+            # get info first
+            n, nIncDir = self.getNAndDir(c, myDir)
+
+            # update self
             self.ijkCrossings[c][myDir] = newArc
+
+            # update neighbor
+            self.ijkCrossings[n][nIncDir] = newArc
 
     # swap handedness of a given crossing in-place
     def swapCrossing(self, c):
@@ -131,70 +138,32 @@ class Knot:
         if c is None:
             print("Error: Can't smooth a crossing that's already removed")
             return
-        
+
         # get all info needed
-        i = self.ijkCrossings[c]['i']
+        i0 = self.ijkCrossings[c]['i0']
+        i1 = self.ijkCrossings[c]['i1']
         j = self.ijkCrossings[c]['j']
         k = self.ijkCrossings[c]['k']
-        i0N, i0NIncDir = self.getNAndDir(c, 'i0')
-        i1N, i1NIncDir = self.getNAndDir(c, 'i1')
-        jN, jNIncDir = self.getNAndDir(c, 'j')
-        kN, kNIncDir = self.getNAndDir(c, 'k')
 
-        # get the crossings of the i arc, and the other points on j and ks arcs
-        iCross0, iCross1 = self.getOrderedICrossings(c)
-        jCrossOther = self.getOtherJKCrossing(c, 'j')
-        kCrossOther = self.getOtherJKCrossing(c, 'k')
+        # check for the number of arcs that are the same
+        numSameArcs = 4 - len(set([i0, i1, j, k]))
 
-        # get relevent crossings inbetween crossings
-        kCrossingsAsI = self.getCrossingsBetween(c, kCrossOther, 'k', forceToTip=True)
-        i1CrossingsAsI = self.getCrossingsBetween(c, iCross1, 'i1', forceToTip=True)
+        # let j and i0 take over k and i1 to propogate change to neighbors
+        self.updateCrossing(c, {
+            'i1': j,
+            'k': i0,
+        })
 
-        # check for number of unknots to be made
-        if i0N == c and i1N == c:
-            numUnknotsMade = 2
-        elif i0N == c or i1N == c:
-            numUnknotsMade = 1
-        else:
-            numUnknotsMade = 0
+        print("After updating:")
+        print(self)
 
-        # k arc becomes i
-        # update the crossings on k
-        for cBetween, _ in kCrossingsAsI:
-            self.ijkCrossings[cBetween]['i'] = i
-        
-        # update the other end of k
-        self.ijkCrossings[kCrossOther]['j'] = i
-
-        # i1 arc becomes j
-        # update the crossings on i1
-        for cBetween, _ in i1CrossingsAsI:
-            self.ijkCrossings[cBetween]['i'] = j
-
-        # update the other end of i1
-        self.ijkCrossings[iCross1]['j'] = j
-
-        # connect neighbors between jN -> i1 curve
-        self.ijkCrossingNs[jN][jNIncDir] = i1N
-        self.ijkCrossingNs[i1N][i1NIncDir] = jN
-
-        # connect neighbors between i0 -> k curve
-        self.ijkCrossingNs[i0N][i0NIncDir] = kN
-        self.ijkCrossingNs[kN][kNIncDir] = i0N
-
-        # remove crossing from ijkCrossings, and handedness
+        # remove crossing
         self.ijkCrossings[c] = None
-        self.ijkCrossingNs[c] = None
         self.handedness[c] = None
 
-        # special case where we've removed all crossings except one
-        if len([c for c in self.ijkCrossings if c is not None]) == 1:
-            ind = [i for i, c in enumerate(self.ijkCrossings) if c is not None][0]
-            # set all i, j, k to be itself
-            self.ijkCrossings[ind] = {'i': ind, 'j': ind, 'k': ind}
+        # increase the number of unknots
+        self.numUnknots += numSameArcs
 
-        # incease the number of unknots
-        self.numUnknots += numUnknotsMade
 
     # return an R1 crossing and the crossings between it, or None if none exist.
     # guaranteed to not return a crossing in a direction with a path with a vertex
@@ -435,9 +404,15 @@ if __name__ == "__main__":
     print(myKnot)
 
     # swap
-    swap = 0
-    myKnot.swapCrossing(swap)
-    print("\nAfter swapping {}".format(swap))
+    # swap = 0
+    # myKnot.swapCrossing(swap)
+    # print("\nAfter swapping {}".format(swap))
+    # print(myKnot)
+
+    # smooth
+    smooth = 0
+    myKnot.smoothCrossing(smooth)
+    print("\nAfter smoothing {}".format(smooth))
     print(myKnot)
 
     # print(myKnot.getNAndDir(0, 'i1'))
