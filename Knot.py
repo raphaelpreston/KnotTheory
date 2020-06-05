@@ -4,9 +4,8 @@ import copy
 
 
 class Knot:
-    def __init__(self, ijkCrossings, ijkCrossingNs, handedness, numUnknots=0, name=""):
+    def __init__(self, ijkCrossings, handedness, numUnknots=0, name=""):
         self.ijkCrossings = ijkCrossings
-        self.ijkCrossingNs = ijkCrossingNs
         self.handedness = handedness
         self.numUnknots = numUnknots
         self.name = name
@@ -16,9 +15,6 @@ class Knot:
         s = "---- Knot {}----\n".format("{} ".format(self.name))
         s += "Crossings:\n"
         for i, c in enumerate(self.ijkCrossings):
-            s += "  {}: {}\n".format(i, c)
-        s += "Neighbors:\n"
-        for i, c in enumerate(self.ijkCrossingNs):
             s += "  {}: {}\n".format(i, c)
         s += "Handedness: {}\n".format(self.handedness)
         s += "Unknots: {}\n".format(self.numUnknots)
@@ -31,40 +27,25 @@ class Knot:
     # return true if this knot is an, or series of, unknot(s)
     def isUnlink(self):
         return all([c is None for c in self.ijkCrossings])
-
-    # return the two end-crossings on c's 'i' arc in cyclical order
-    def getOrderedICrossings(self, c):
-        i = self.ijkCrossings[c]['i']
-
-        # first is the crossing where i = k, second is the crossing where i = j
-        first = [ ind for ind, crossings in enumerate(self.ijkCrossings)
-                  if crossings and crossings['k'] == i]
-        second = [ind for ind, crossings in enumerate(self.ijkCrossings)
-                  if crossings and crossings['j'] == i]
-        if len(first) > 1 or len(second) > 1:
-            print("Error: Found more than one first/second crossing for i")
-            print("Firsts: {}".format(first))
-            print("Seconds: {}".format(second))
-            print("Crossings:")
-            for crossing in self.ijkCrossings:
-                print(crossing)
-            return
-        return first[0], second[0]
-
-
-    # return the crossing at the other end of c's arc in the 'i' or 'j' dir
-    def getOtherJKCrossing(self, c, myDir):
-        if myDir != "j" and myDir != "k":
-            print("Error: Only used for j and k, not {}".format(myDir))
-            return
+    
+    # return the neighbor in a direction from c, and the incoming direction on said neighbor
+    def getNAndDir(self, c, myDir):
+        # get arcNum in that direction
         myArc = self.ijkCrossings[c][myDir]
-        lookingForType = "k" if myDir == "j" else "j"
-        otherCrossing = [ind for ind, crossings in enumerate(self.ijkCrossings)
-                         if crossings and crossings[lookingForType] == myArc]
-        if len(otherCrossing) > 1:
-            print("Error: Found more than one crossing for {}".format(myDir))
-            return
-        return otherCrossing[0]
+
+        # get all crossings that share the arc
+        crossingsOnArc = [
+            cr for cr, cData in enumerate(self.ijkCrossings) if 
+            any([arc == myArc for _, arc in cData.items()])
+        ]
+
+        # guaranteed to have two crossings per arc
+        n = [cr for cr in crossingsOnArc if cr != c][0]
+
+        # get the incoming direction on that crossing
+        incDir = [myDir for myDir, arc in self.ijkCrossings[n].items() if arc == myArc]
+
+        return n, incDir
 
     # return the crossings & (over, under) of each crossing between
     # crossing1 -> crossing2 in the inDir (i0/1, j, or k) direction
@@ -103,134 +84,47 @@ class Knot:
         crossingsFound.pop()
         return crossingsFound
      # return c2's persepective of incoming direction from c1 in outDir to c2
-    
-    def getNAndDir(self, c1, outDir):
-        # get neighbor
-        n = self.ijkCrossingNs[c1][outDir]
-        # get incoming direction
-        return n, self.getIncomingDir(c1, outDir, n)
 
-    # function to return the c1s dir from c2s perspective
-    def getIncomingDir(self, c1, outDir, c2):
-
-        # error check
-        if self.ijkCrossingNs[c1][outDir] != c2:
-            print("Error: C1 -> outdir didn't lead to C2")
-            return None
-        
-        # get the crossings of the i arc, and the other points on j and ks arcs
-        iCross0, iCross1 = self.getOrderedICrossings(c1)
-        jCrossOther = self.getOtherJKCrossing(c1, 'j')
-        kCrossOther = self.getOtherJKCrossing(c1, 'k')
-
-        # get all neighbors
-        i0N = self.ijkCrossingNs[c1]['i0']
-        i1N = self.ijkCrossingNs[c1]['i1']
-        jN = self.ijkCrossingNs[c1]['j']
-        kN = self.ijkCrossingNs[c1]['k']
-
-        # intuition is that we can figure out what the incoming direction has to
-        # be based on whether or not the other end of the arc is our neighbor
-
-        # special case where c2 is c1's neighbor, incoming on i0/i1, but the i arc
-        # loops around back into this crossing, meaning that c2 crossing is
-        # technically the end of the arc. we know this is the case if the neighbor
-        # of the current crossing in the i1 direction is itself. if the next crossing
-        # were anything else, then we would be sure that this wouldn't be the case.
-        # TODO: prove this
-
-        # we need to check c1 != c2 to make sure that we don't get stuck in a loop
-        if self.ijkCrossingNs[c2]['i1'] == c2 and c1 != c2: # must loop
-            modDir = {'i0': 'i', 'i1': 'i', 'j': 'j', 'k': 'k'}[outDir]
-            if self.ijkCrossings[c1][modDir] == self.ijkCrossings[c2]['i']:
-                # there are at least two crossings, so we know we arrived on i
-                # if this is true
-                v = {'i1': 'i0', 'k': 'i0', 'i0': 'i1', 'j': 'i1'}[outDir]
-            else: # we arrived on j or k
-                v = {'i1': 'j', 'k': 'j', 'i0': 'k', 'j': 'k'}[outDir]
-        elif self.ijkCrossingNs[c2]['i0'] == c2 and c1 != c2:
-            v = 'i1'
-        else: # no loop
-            v = {
-                'i0': 'k' if iCross0 == i0N else 'i1',
-                'i1': 'j' if iCross1 == i1N else 'i0',
-                'j': 'k' if jCrossOther == jN else 'i1',
-                'k': 'j' if kCrossOther == kN else 'i0'
-            }[outDir]
-
-        return v
+    # update a crossing with given dirs and crossings in newCrossings
+    def updateCrossing(self, c, newCrossings):
+        # for each dir supplied, update self and propogate change
+        for myDir, newArc in newCrossings.items():
+            self.ijkCrossings[c][myDir] = newArc
 
     # swap handedness of a given crossing in-place
-    def swapCrossing(self, crossingIndex):
-        if crossingIndex is None:
+    def swapCrossing(self, c):
+        if c is None:
             print("Error: Can't swap a crossing that's already removed")
             return
 
-        i = self.ijkCrossings[crossingIndex]['i']
-        j = self.ijkCrossings[crossingIndex]['j']
-        k = self.ijkCrossings[crossingIndex]['k']
-        myNs = self.ijkCrossingNs[crossingIndex]
-        jN, kN, i0N, i1N = myNs['j'], myNs['k'], myNs['i0'], myNs['i1']
+        # get all affected neighbors
+        # i0N, i0NInc = self.getNAndDir(c, 'i0')
+        # i1N, i1NInc = self.getNAndDir(c, 'i1')
+        # jN, jNInc = self.getNAndDir(c, 'j')
+        # kN, kNInc = self.getNAndDir(c, 'k')
 
-        # get the crossings of the i arc, and the other points on j and ks arcs
-        iCross0, _ = self.getOrderedICrossings(crossingIndex)
-        kCrossOther = self.getOtherJKCrossing(crossingIndex, 'k')
+        # # update own crossing
+        # newI0, newI1, newJ, newK = j, k, i0, i1
 
+        # # update all neighboring crossings
+        # self.ijkCrossings[i0N][i0nInc] = 
 
-        # get the crossings over which the i, j, or k arcs pass through (as i),
-        # but don't need to know the crossings between i and iCross1.
-        # the crossings between inherently are crossings where the arc is i
-        i0CrossingsAsI = [ # only care about crossing numbers
-            c for c, _ in self.getCrossingsBetween(crossingIndex, iCross0, 'i0', forceToTip=True)
-        ]
-        kCrossingsAsI = [
-            c for c, _ in self.getCrossingsBetween(crossingIndex, kCrossOther, 'k', forceToTip=True)
-        ]
-        
-        # special cases where we are swapping a loop
-        if i1N == crossingIndex:
-            newK, newI = k, k
-            newJ = i
-        elif i0N == crossingIndex:
-            newJ, newI = j, j
-            newK = i
-        else: # not a loop
-            # from crossing -> iCross1 stays i's old arcNum, but it's the new k
-            newK = i
-            # all crossings between crossing -> iCross1 stay constant
+        # get connected arcs
+        i0 = self.ijkCrossings[c]['i0']
+        i1 = self.ijkCrossings[c]['i1']
+        j = self.ijkCrossings[c]['j']
+        k = self.ijkCrossings[c]['k']
 
-            # the new arc formed from iCross0 to crossing steals k's arcNum since
-            # k's arcNum will be engulfed by j
-            newJ = k
-
-            # update all crossings inbetween crossing and iCross0
-            for c in i0CrossingsAsI:
-                self.ijkCrossings[c]['i'] = k
-            
-            # change the value at iCross0 too
-            self.ijkCrossings[iCross0]['k'] = k
-
-            # j's arcNum extends into k to become the new i
-            newI = j
-
-            # update crossings between crossing and other tip of k
-            for c in kCrossingsAsI:
-                self.ijkCrossings[c]['i'] = j
-
-            # update the value at tip of k
-            self.ijkCrossings[kCrossOther]['j'] = j
-
-            # the i's on crossings between crossing and other tip of j stay constant
-            # as well as the tip of j
-
-        # update the neighbors
-        myNs['i0'], myNs['i1'], myNs['j'], myNs['k'] = jN, kN, i0N, i1N
-
-        # replace our crossing with the new values
-        self.ijkCrossings[crossingIndex] = {'i': newI, 'j': newJ, 'k': newK}
+        # swap crossing and propogate changes
+        self.updateCrossing(c, {
+            'i0': j,
+            'i1': k,
+            'j': i0,
+            'k': i1
+        })
 
         # switch the handedness
-        self.handedness[crossingIndex] = "left" if self.handedness == "right" else "right"
+        self.handedness = {'left': 'right', 'right': 'left'}[self.handedness[c]]
 
     # smooth a given crossing in-place, could increase self.numUnknots
     def smoothCrossing(self, c):
@@ -522,45 +416,59 @@ class Knot:
 if __name__ == "__main__":
     # figure 8 knot for testing
     ijkCrossings = [
-        {'i': 2, 'j': 3, 'k': 0},
-        {'i': 3, 'j': 0, 'k': 1},
-        {'i': 0, 'j': 1, 'k': 2},
-        {'i': 1, 'j': 2, 'k': 3}
+        {'i0': 3, 'i1': 4, 'j': 6, 'k': 7},
+        {'i0': 5, 'i1': 6, 'j': 0, 'k': 1},
+        {'i0': 7, 'i1': 0, 'j': 2, 'k': 3},
+        {'i0': 1, 'i1': 2, 'j': 4, 'k': 5},
     ]
-    ijkCrossingNs = [
-        {'i0': 2, 'i1': 3, 'j': 1, 'k': 2},
-        {'i0': 3, 'i1': 0, 'j': 2, 'k': 3},
-        {'i0': 0, 'i1': 1, 'j': 3, 'k': 0},
-        {'i0': 1, 'i1': 2, 'j': 0, 'k': 1}
-    ]
+    # ijkCrossingNs = [
+    #     {'i0': 2, 'i1': 3, 'j': 1, 'k': 2},
+    #     {'i0': 3, 'i1': 0, 'j': 2, 'k': 3},
+    #     {'i0': 0, 'i1': 1, 'j': 3, 'k': 0},
+    #     {'i0': 1, 'i1': 2, 'j': 0, 'k': 1}
+    # ]
     handedness = ['left', 'right', 'left', 'right']
 
-    myKnot = Knot(ijkCrossings, ijkCrossingNs, handedness)
-
- 
-    # print(myKnot.computeHomfly())
-
-    ################## -------------- TS5 --------- ##############
+    myKnot = Knot(ijkCrossings, handedness)
 
     print("original: ")
     print(myKnot)
 
-    # smooth 0
-    smooth = 0
-    myKnot.smoothCrossing(smooth)
-    print("\nAfter smoothing {}".format(smooth))
-    print(myKnot)
-
-    # reduce
-    myKnot.reduceR1s()
-    print("\nAfter reducing")
-    print(myKnot)
-
-    # swap 1
-    swap = 1
+    # swap
+    swap = 0
     myKnot.swapCrossing(swap)
     print("\nAfter swapping {}".format(swap))
     print(myKnot)
+
+    # print(myKnot.getNAndDir(0, 'i1'))
+
+    
+
+ 
+
+    # print(myKnot.computeHomfly())
+
+    ################## -------------- TS5 --------- ##############
+
+    # print("original: ")
+    # print(myKnot)
+
+    # smooth 0
+    # smooth = 0
+    # myKnot.smoothCrossing(smooth)
+    # print("\nAfter smoothing {}".format(smooth))
+    # print(myKnot)
+
+    # # reduce
+    # myKnot.reduceR1s()
+    # print("\nAfter reducing")
+    # print(myKnot)
+
+    # # swap 1
+    # swap = 1
+    # myKnot.swapCrossing(swap)
+    # print("\nAfter swapping {}".format(swap))
+    # print(myKnot)
 
     # # reduce
     # myKnot.reduceR1s()
