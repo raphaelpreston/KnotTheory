@@ -1,0 +1,71 @@
+CORRECT SCRIPT:
+
+original: 
+crossings:
+  0: {'i': 2, 'j': 3, 'k': 0}
+  1: {'i': 3, 'j': 0, 'k': 1}
+  2: {'i': 0, 'j': 1, 'k': 2}
+  3: {'i': 1, 'j': 2, 'k': 3}
+neighbors:
+  0: {'i0': 2, 'i1': 3, 'j': 1, 'k': 2}
+  1: {'i0': 3, 'i1': 0, 'j': 2, 'k': 3}
+  2: {'i0': 0, 'i1': 1, 'j': 3, 'k': 0}
+  3: {'i0': 1, 'i1': 2, 'j': 0, 'k': 1}
+Handedness: ['left', 'right', 'left', 'right']
+Unknots: 0
+
+After smoothing 0
+crossings:
+  0: None
+  1: {'i': 3, 'j': 2, 'k': 1}
+  2: {'i': 2, 'j': 1, 'k': 2}
+  3: {'i': 1, 'j': 3, 'k': 3}
+neighbors:
+  0: None
+  1: {'i0': 3, 'i1': 3, 'j': 2, 'k': 3}
+  2: {'i0': 2, 'i1': 1, 'j': 3, 'k': 2}
+  3: {'i0': 1, 'i1': 2, 'j': 1, 'k': 1}
+Handedness: [None, 'right', 'left', 'right']
+Unknots: 0
+
+After smoothing 2
+crossings:
+  0: None
+  1: {'i': 3, 'j': 1, 'k': 1}
+  2: None
+  3: {'i': 1, 'j': 3, 'k': 3}
+neighbors:
+  0: None
+  1: {'i0': 3, 'i1': 3, 'j': 3, 'k': 3}
+  2: None
+  3: {'i0': 1, 'i1': 1, 'j': 1, 'k': 1}
+Handedness: [None, 'right', None, 'right']
+Unknots: 1
+
+After smoothing 1
+crossings:
+  0: None
+  1: None
+  2: None
+  3: {'i': 3, 'j': 3, 'k': 3}
+neighbors:
+  0: None
+  1: None
+  2: None
+  3: {'i0': 3, 'i1': 3, 'j': 3, 'k': 3}
+Handedness: [None, None, None, 'right']
+Unknots: 1
+
+After smoothing 3
+crossings:
+  0: None
+  1: None
+  2: None
+  3: None
+neighbors:
+  0: None
+  1: None
+  2: None
+  3: None
+Handedness: [None, None, None, None]
+Unknots: 3

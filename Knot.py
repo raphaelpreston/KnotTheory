@@ -1,20 +1,36 @@
 from sympy import symbols, Matrix
+from random import choice
 import copy
 
+
 class Knot:
-    def __init__(self, ijkCrossings, ijkCrossingNs, handedness):
+    def __init__(self, ijkCrossings, ijkCrossingNs, handedness, numUnknots=0, name=""):
         self.ijkCrossings = ijkCrossings
         self.ijkCrossingNs = ijkCrossingNs
         self.handedness = handedness
-        self.numUnknots = 0
+        self.numUnknots = numUnknots
+        self.name = name
     
+
+    def __str__(self):
+        s = "---- Knot {}----\n".format("{} ".format(self.name))
+        s += "Crossings:\n"
+        for i, c in enumerate(self.ijkCrossings):
+            s += "  {}: {}\n".format(i, c)
+        s += "Neighbors:\n"
+        for i, c in enumerate(self.ijkCrossingNs):
+            s += "  {}: {}\n".format(i, c)
+        s += "Handedness: {}\n".format(self.handedness)
+        s += "Unknots: {}\n".format(self.numUnknots)
+        return s
+
     # return true if myDir is a valid direction
     def checkArcType(self, myDir):
         return myDir in ["i0", "i1", "j", "k"]
 
-    # return true if this knot is the unknot
-    def isUnknot(self):
-        return len(self.ijkCrossings) == 0
+    # return true if this knot is an, or series of, unknot(s)
+    def isUnlink(self):
+        return all([c is None for c in self.ijkCrossings])
 
     # return the two end-crossings on c's 'i' arc in cyclical order
     def getOrderedICrossings(self, c):
@@ -305,81 +321,61 @@ class Knot:
                     jOrK = sorted(dirsForArc)[1]
 
                     # get neighbor in that direction and record it
-                    jOrKN, _ = self.ijkCrossingNs[crossing][jOrK]
-
-                    # skip looking if it's a trivial loop
-                    if jOrKN == crossing:
-                        return (crossing, [], "over")
+                    jOrKN = self.ijkCrossingNs[crossing][jOrK]
 
                     # loop goes in i1 direction or i0 direction depending
                     dirToSearch = {"j": "i1", "k": "i0"}[jOrK]
-                    
+
+                    # skip looking if it's a trivial loop
+                    if jOrKN == crossing:
+                        return (crossing, [], dirToSearch, "over")
+
                     # shortcut to get crossings between. can't call using crossing
                     # twice because incDir won't work on crossing. < dunno bout this anymore
                     between = self.getCrossingsBetween(crossing, jOrKN, dirToSearch)
+                    csBetween = [c for c, _ in between] + [jOrKN]
+                    
+                    # special case to detect a link - can't reduce a link
+                    if len(csBetween) != 1:
+                        return (crossing, csBetween, dirToSearch, "over")
 
-                    return (crossing,
-                        [c for c, _ in between] + [jOrKN],
-                        dirToSearch,
-                        "over"
-                    )
-
-        # then, all crossings between a given crossing must be "under"
+        # then, all crossings between a given crossing need to be "under"
         for crossing in range(len(self.ijkCrossings)):
             ijk = self.ijkCrossings[crossing]
             if ijk is not None:
                 for myDir in ['i0', 'i1']: # try both directions
                     between = self.getCrossingsBetween(crossing, crossing, myDir)
                     if all([myType == "under" for _, myType in between]):
-                        return (
-                            crossing, 
-                            [c for c, _ in between], # only care about crossings
-                            myDir,
-                            "under"
-                        )
-        return None, None, None
+                        # special case to detect a link - can't reduce a link
+                        if len(csBetween) != 1:
+                            return (
+                                crossing, 
+                                [c for c, _ in between], # only care about crossings
+                                myDir,
+                                "under"
+                            )
+        return None, None, None, None
 
     # repeatedly reduces all R1 crossings until there are none left
-    def reduceR1s(self):
+    def reduceR1s(self, numReductions=float("inf")):
+
+        # TODO: this will break if a crossing being removed changes another
+        # TODO: crossing that was on the path to be removed. prove it won't
 
         # identify an R1 crossing and remove it via an R1 move
-        r1Crossing, csBetweenSelf, myDir = self.getR1Crossing()
-        print(r1Crossing, csBetweenSelf, myDir)
         # we know that the path doesn't contain the same vertex twice
-        # if the path goes all "over", then all we have to do is remove crossings
-        # and adjust neighbors, no connecting has to be done
-        
-        # remove each crossing on the path
-        # for cBetween in csBetweenSelf:
-        if True:
-            cBetween = csBetweenSelf[0]
-
-            # each crossing has a single partner crossing. all crossings are unique.
-            # the path either goes over all crossings or under all crossings.
-
-            # if "over", set k and j neighbors to be their own neighbors
-            # if "under", set i1 and i0 neighbors to be neighbors
-
-            # remove the crossing
-
-
-            # find the crossing's partner crossing aka where it leaves the loop again
-            # if the type is "over", then the partner is in the k direction,
-            # if it's "under", then the partner is in the i1 direction
-
-            # find the neighbors to the outside of the loop for each set of partners
-
-            # find the immediate neighbors inside of the loop (between the partners)
-
-            # the outside neighbor(s) (maybe the they're the same) need their neighbors
-            # to become the neighbors inside the loop. if there are no neighbors
-            # inside the loop then they become neighbors of each other
-
-            # if outside neighbors are the same, then that neighbor's
-            # neighbor becomes itself (in 2 directions)
-
-            # remove both partner crossings
-            self.removeCrossing(cBetween)
+        reduced = 0
+        while True:
+            print("Reduction #{}".format(reduced))
+            c, csBetweenSelf, myDir, pathType = self.getR1Crossing()
+            if c is not None and reduced < numReductions:
+                for cBetweenSelf in csBetweenSelf + [c]: # must remove c last
+                    print("  - Remove {}".format(cBetweenSelf))
+                    self.removeCrossing(cBetweenSelf)
+                reduced += 1
+            else:
+                print(" - nothing, all done")
+                break
 
     # remove a crossing from a knot diagram, connecting the neighbors to each other
     # it's possible that this puts the diagram in an invalid state
@@ -444,6 +440,83 @@ class Knot:
         self.ijkCrossingNs[c] = None
         self.handedness[c] = None
 
+    # return a duplicated version of this knot (optionally named)
+    def duplicate(self, name=""):
+        return Knot(self.ijkCrossings, self.ijkCrossingNs, self.handedness, self.numUnknots, name)
+
+
+    # internal recursive function for computing homfly
+    def _homfly(self, k, l, m, distCrossing=None):
+        print("{}: computing HOMFLY:".format(k.name))
+        print(k)
+
+        # reduce all R1 crossings out of our knot
+        k.reduceR1s()
+        k.name += "r"
+        print(k)
+
+        # base case: k is an unlink of n components
+        if k.isUnlink():
+            n = k.numUnknots
+            poly = (-m**-1)**(n-1) * (l + l**(-1))**(n-1)
+            print("{}: hit basecase, n={}:  {}".format(k.name, n, poly))
+            return poly
+
+        # get our distinguished crossing if not given
+        if distCrossing is None:
+            validCrossings = [i for i, c in enumerate(k.ijkCrossings) if c is not None]
+            distCrossing = validCrossings[0]
+        isRight = {'right': True, 'left': False}[k.handedness[distCrossing]]
+        # print("{}: distinguished crossing {} ({} handed)".format(k.name, distCrossing, "right" if isRight else "left"))
+            
+        # copy knot and modify accordingly
+        kR, kL, kS = k.duplicate(), k.duplicate(), k.duplicate()
+        if isRight:
+            print("{}: swapping '{}' from right to left".format(k.name, distCrossing))
+            kL.swapCrossing(distCrossing)
+        else:
+            print("{}: swapping '{}' from left to right".format(k.name, distCrossing))
+            kR.swapCrossing(distCrossing)
+        print("{}: smoothing '{}'".format(k.name, distCrossing))
+        kS.smoothCrossing(distCrossing)
+
+        # assign new names
+        kR.name += "r"
+        kL.name += "l"
+        kS.name += "s"
+
+        print("Right Handed: ")
+        print(kR)
+        print("Left Handed: ")
+        print(kL)
+        print("Smoothed: ")
+        print(kS)
+
+        # compute necessary polynomials
+        # if isRight:
+        #     pL = self._homfly(kL, l, m)
+        #     print("{}: solved: {}".format(kL.name, pL))
+        # else:
+        #     pR = self._homfly(kR, l, m)
+        #     print("{}: solved: {}".format(kR.name, pR))
+        # pS = self._homfly(kS, l, m)
+        # print("{}: solved: {}".format(kS.name, pS))
+
+        # # return equation solved for the correct polynomial
+        # if isRight:
+        #     v = (-m * pS - l**-1 * pL) * l**-1
+        # else:
+        #     v = (-m * pS - l * pR) * l
+        # print("{}: returning {}".format(k.name, v))
+        # return v
+
+    # recursively compute the homfly polynomial
+    def computeHomfly(self):
+
+        # share symbols with all new knots' equations
+        l, m = symbols("l m")
+
+        return self._homfly(self.duplicate(name="K"), l, m)
 
 
 if __name__ == "__main__":
@@ -454,12 +527,6 @@ if __name__ == "__main__":
         {'i': 0, 'j': 1, 'k': 2},
         {'i': 1, 'j': 2, 'k': 3}
     ]
-    # ijkCrossingNs = [
-    #     {'i0': (2, 'k'), 'i1': (3, 'j'), 'j': (1, 'i1'), 'k': (2, 'i0')},
-    #     {'i0': (3, 'k'), 'i1': (0, 'j'), 'j': (2, 'i1'), 'k': (3, 'i0')},
-    #     {'i0': (0, 'k'), 'i1': (1, 'j'), 'j': (3, 'i1'), 'k': (0, 'i0')},
-    #     {'i0': (1, 'k'), 'i1': (2, 'j'), 'j': (0, 'i1'), 'k': (1, 'i0')},
-    # ]
     ijkCrossingNs = [
         {'i0': 2, 'i1': 3, 'j': 1, 'k': 2},
         {'i0': 3, 'i1': 0, 'j': 2, 'k': 3},
@@ -470,51 +537,65 @@ if __name__ == "__main__":
 
     myKnot = Knot(ijkCrossings, ijkCrossingNs, handedness)
 
-    def printStuff():
-        print("crossings:")
-        for i, c in enumerate(myKnot.ijkCrossings):
-            print("  {}: {}".format(i, c))
-        print("neighbors: ")
-        for i, c in enumerate(myKnot.ijkCrossingNs):
-            print("  {}: {}".format(i, c))
-        print("Handedness: {}".format(myKnot.handedness))
-        print("Unknots: {}".format(myKnot.numUnknots))
+ 
+    # print(myKnot.computeHomfly())
+
+    ################## -------------- TS5 --------- ##############
 
     print("original: ")
-    printStuff()
+    print(myKnot)
 
-    # test smooth crossings
-    # test smooth crossings
+    # smooth 0
     smooth = 0
     myKnot.smoothCrossing(smooth)
     print("\nAfter smoothing {}".format(smooth))
-    printStuff()
+    print(myKnot)
 
-    # test smooth crossings
-    smooth = 2
-    myKnot.smoothCrossing(smooth)
-    print("\nAfter smoothing {}".format(smooth))
-    printStuff()
+    # reduce
+    myKnot.reduceR1s()
+    print("\nAfter reducing")
+    print(myKnot)
 
-    # test smooth crossings
-    smooth = 1
-    myKnot.smoothCrossing(smooth)
-    print("\nAfter smoothing {}".format(smooth))
-    printStuff()
+    # swap 1
+    swap = 1
+    myKnot.swapCrossing(swap)
+    print("\nAfter swapping {}".format(swap))
+    print(myKnot)
 
-    # test smooth crossings
-    smooth = 3
-    myKnot.smoothCrossing(smooth)
-    print("\nAfter smoothing {}".format(smooth))
-    printStuff()
+    # # reduce
+    # myKnot.reduceR1s()
+    # print("\nAfter reducing")
+    # print(myKnot)
 
 
+    ################## -------------- NEW2 ------------ ###############
+    # print("original: ")
+    # printStuff()
 
     # # test swap crossings
     # swap = 0
     # myKnot.swapCrossing(swap)
     # print("\nAfter swapping {}".format(swap))
     # printStuff()
+
+    # # test reduce
+    # myKnot.reduceR1s()
+    # print("\nAfter reducing")
+    # printStuff()
+
+    ################ ------------- NEW1 ------------- ###############
+    # print("original: ")
+    # printStuff()
+
+    # print("\nGetting an R1 should be None: {}".format(myKnot.getR1Crossing()))
+
+    # # test swap crossings
+    # swap = 0
+    # myKnot.swapCrossing(swap)
+    # print("\nAfter swapping {}".format(swap))
+    # printStuff()
+
+    # print("\nGetting an R1 should be (1, [0, 2], 'i1', 'over'): {}".format(myKnot.getR1Crossing()))
 
     # # test removal
     # remove = 0
@@ -528,29 +609,30 @@ if __name__ == "__main__":
     # print("\nAfter removing {}".format(remove))
     # printStuff()
 
+    # print("\nGetting an R1 should be (1, [], 'over'): {}".format(myKnot.getR1Crossing()))
+
     # # test removal
     # remove = 1
     # myKnot.removeCrossing(remove)
     # print("\nAfter removing {}".format(remove))
     # printStuff()
 
-    # test removal
+    # print("\nGetting an R1 should be (3, [], 'over'): {}".format(myKnot.getR1Crossing()))
+
+    # # test removal
     # remove = 3
     # myKnot.removeCrossing(remove)
-    # print("After removing {}".format(remove))
+    # print("\nAfter removing {}".format(remove))
     # printStuff()
 
-    # test smooth crossings
-    # smooth = 3
-    # myKnot.smoothCrossing(smooth)
-    # print("\nAfter smoothing {}".format(smooth))
-    # printStuff()
+    # print("\nGetting an R1 should be None: {}".format(myKnot.getR1Crossing()))
 
-    # test R1 reduction
-    # print()
-    # myKnot.reduceR1s()
-    # print("After reduce R1s:")
-    # printStuff()
+
+#################### ------------------------------ #################
+
+
+
+
 
 # TODO:
 # - undo all trivial R1 moves to cut down on necessary recursive steps also cus ez
