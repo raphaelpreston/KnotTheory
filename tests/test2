@@ -1,0 +1,87 @@
+original:
+---- Knot  ----
+Crossings:
+  0: {'i0': 3, 'i1': 4, 'j': 6, 'k': 7}
+  1: {'i0': 5, 'i1': 6, 'j': 0, 'k': 1}
+  2: {'i0': 7, 'i1': 0, 'j': 2, 'k': 3}
+  3: {'i0': 1, 'i1': 2, 'j': 4, 'k': 5}
+Handedness: ['left', 'right', 'left', 'right']
+Unknots: 0
+
+
+After smoothing 0
+---- Knot  ----
+Crossings:
+  0: None
+  1: {'i0': 5, 'i1': 6, 'j': 0, 'k': 1}
+  2: {'i0': 3, 'i1': 0, 'j': 2, 'k': 3}
+  3: {'i0': 1, 'i1': 2, 'j': 6, 'k': 5}
+Handedness: [None, 'right', 'left', 'right']
+Unknots: 0
+
+Reduction #1
+  - Remove 2
+Reduction #2
+ - nothing, all done
+
+After reducing
+---- Knot  ----
+Crossings:
+  0: None
+  1: {'i0': 5, 'i1': 6, 'j': 2, 'k': 1}
+  2: None
+  3: {'i0': 1, 'i1': 2, 'j': 6, 'k': 5}
+Handedness: [None, 'right', None, 'right']
+Unknots: 0
+
+
+After smoothing 1
+---- Knot  ----
+Crossings:
+  0: None
+  1: None
+  2: None
+  3: {'i0': 5, 'i1': 2, 'j': 2, 'k': 5}
+Handedness: [None, None, None, 'right']
+Unknots: 0
+
+
+After smoothing 3
+---- Knot  ----
+Crossings:
+  0: None
+  1: None
+  2: None
+  3: None
+Handedness: [None, None, None, None]
+Unknots: 2
+
+
+
+----
+
+print("original: ")
+print(myKnot)
+
+# smooth
+smooth = 0
+myKnot.smoothCrossing(smooth)
+print("\nAfter smoothing {}".format(smooth))
+print(myKnot)
+
+# reduce
+myKnot.reduceR1s()
+print("\nAfter reducing")
+print(myKnot)
+
+# smooth
+smooth = 1
+myKnot.smoothCrossing(smooth)
+print("\nAfter smoothing {}".format(smooth))
+print(myKnot)
+
+# smooth
+smooth = 3
+myKnot.smoothCrossing(smooth)
+print("\nAfter smoothing {}".format(smooth))
+print(myKnot)

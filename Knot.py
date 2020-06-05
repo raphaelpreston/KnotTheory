@@ -1,6 +1,7 @@
 from sympy import symbols, Matrix
 from random import choice
 import copy
+import json
 
 
 class Knot:
@@ -58,8 +59,8 @@ class Knot:
         # keep going until we hit our destination crossing
         currCrossing = c1
         currDir = inDir
+        hitDest = False
         while True: # want to go at least once
-
 
             # get the next crossing in direction and how it arrives to neighbor
             nextCrossing, incDir = self.getNAndDir(currCrossing, currDir)
@@ -75,8 +76,14 @@ class Knot:
             # break if necessary
             if currCrossing == c2:
                 if forceToTip:
-                    if myType == "under": # only break when the arc ends
-                        break
+                    if myType == "over":
+                        if hitDest: # already hit dest once before
+                            break
+                        else:
+                            hitDest = True
+                    else: # type is under
+                        if myType == "under": 
+                            break
                 else:
                     break
         
@@ -139,9 +146,6 @@ class Knot:
             'k': i0,
         })
 
-        print("After updating:")
-        print(self)
-
         # remove crossing
         self.ijkCrossings[c] = None
         self.handedness[c] = None
@@ -152,13 +156,28 @@ class Knot:
     # return an R1 crossing, the crossings between it, the direction in which the
     # loop goes, and the type of all crossings between ('over' or 'under').
     def getR1Crossing(self):
+
+        # for each crossing
+            # it's an r1 crossing if, for some path that that it belongs to,
+            # for all other knots, that we intersect with, our knot goes over or under
+        
+        for c in range(len(self.ijkCrossings)):
+            if self.ijkCrossings[c] is not None:
+                # get all knots this crossing belongs to
+                paths = self.getKnotPaths()
+                
         
         # check each crossing
         for c in range(len(self.ijkCrossings)):
             if self.ijkCrossings[c] is not None:
                 for myDir in ['i0', 'i1']: # try both directions
                     betweens = self.getCrossingsBetween(c, c, myDir)
-                    if len(betweens) != 1: # special case - can't reduce a link
+                    if len(betweens) == 1: # special case we have a link
+                        # get all crossings on this entire extended arc
+                        print("SPECIAL CASE LINK:")
+                        print(self.getCrossingsBetween(c, c, myDir, forceToTip=True))
+
+                    else:
                         # test if they're all over or all under
                         allOver = all([myType == "over" for _, myType in betweens])
                         allUnder = all([myType == "under" for _, myType in betweens])
@@ -182,8 +201,14 @@ class Knot:
             c, csBetweenSelf, myDir, pathType = self.getR1Crossing()
             if c is not None and reduced < numReductions:
                 for cBetweenSelf in csBetweenSelf + [c]: # must remove c last TODO: CHECK THIS
-                    print("  - Remove {}".format(cBetweenSelf))
+                    numU = self.numUnknots
                     self.removeCrossing(cBetweenSelf)
+                    diff = self.numUnknots - numU
+                    if diff == 0:
+                        text = ""
+                    else:
+                        text = " (+{} unknots)".format(diff)
+                    print("  - Remove {}{}".format(cBetweenSelf, text))
                 reduced += 1
             else:
                 print(" - nothing, all done")
@@ -202,7 +227,7 @@ class Knot:
 
         # this crossing could be the only one left on its knot
         if len(set([i0, i1, j, k])) == 2: # simply increase unknots
-            self.numUnknots += 2
+            self.numUnknots += 1
         else:
             # if it's just a single loop, we want to take the correct j/k and
             # merge with i1/i0
@@ -212,7 +237,7 @@ class Knot:
                 })
             elif i0 == k:
                 self.updateCrossing(c, {
-                    'j': i1
+                    'i1': j
                 })
             else: # not a single loop around to self
                 self.updateCrossing(c, {
@@ -227,7 +252,6 @@ class Knot:
     # return a duplicated version of this knot (optionally named)
     def duplicate(self, name=""):
         return Knot(self.ijkCrossings, self.ijkCrossingNs, self.handedness, self.numUnknots, name)
-
 
     # internal recursive function for computing homfly
     def _homfly(self, k, l, m, distCrossing=None):
@@ -302,6 +326,86 @@ class Knot:
 
         return self._homfly(self.duplicate(name="K"), l, m)
 
+    # return all arcs in given knot diagram
+    def getArcs(self):
+        arcs = set()
+        for crossing, crossingData in enumerate(self.ijkCrossings):
+            if crossingData is not None:
+                for myDir, arc in crossingData.items():
+                    arcs.add(arc)
+        return arcs
+
+    # returns crossings and incoming dirs on a given arc, in order of direction
+    def getArcCrossings(self, arc):
+        c1, c2, c1IncDir, c2IncDir = None, None, None, None
+        for c in range(len(self.ijkCrossings)):
+            if self.ijkCrossings[c] is not None:
+                if self.ijkCrossings[c]['i1'] == arc:
+                    c1, c1IncDir = c, 'i1'
+                if self.ijkCrossings[c]['k'] == arc:
+                    c1, c1IncDir = c, 'k'
+                if self.ijkCrossings[c]['i0'] == arc:
+                    c2, c2IncDir = c, 'i0'
+                if self.ijkCrossings[c]['j'] == arc:
+                    c2, c2IncDir = c, 'j'
+        return c1, c1IncDir, c2, c2IncDir
+
+    # returns all unique (crossing, dir) paths around our knot diagram
+    def getKnotPaths(self): 
+        def cyclicEquiv(a, b): # credit to stackoverflow user salvador-dali
+            if len(a) != len(b):
+                return False
+            str1 = ' '.join(map(str, a))
+            str2 = ' '.join(map(str, b))
+            if len(str1) != len(str2):
+                return False
+            return str1 in str2 + ' ' + str2
+
+        # get all arcs
+        arcsToCheck = self.getArcs()
+
+        # keep track of all paths
+        paths = []
+
+        for sourceArc in arcsToCheck:
+
+            # create a new knot for this arc
+            thisPath = []
+
+            # loop forward until we hit this arc again
+            currArc = sourceArc
+            while True: # want to go at least once
+
+                # get the next crossing and incoming crossing
+                c1, c1OutDir, c2, c2IncDir = self.getArcCrossings(currArc)
+
+                # figure out in which direction to continue searching
+                nextDir = {'i0': 'i1', 'i1': 'i0', 'j': 'k', 'k': 'j'}[c2IncDir]
+
+                # get the next arc
+                nextArc = self.ijkCrossings[c2][nextDir]
+
+                # record findings
+                # thisPath.append((currArc, c2))
+                thisPath.append((c1, c1OutDir))
+                
+                # proceed and break if necessary
+                currArc = nextArc
+                if currArc == sourceArc:
+                    break
+            paths.append(thisPath)
+            
+        # reduce to unique crossing cycles
+        uniques = []
+        for a in paths:
+            exists = False
+            for b in uniques:
+                if cyclicEquiv(a, b):
+                    exists = True
+            if not exists:
+                uniques.append(a)
+        
+        return uniques
 
 if __name__ == "__main__":
     # figure 8 knot for testing
@@ -318,16 +422,72 @@ if __name__ == "__main__":
     print("original: ")
     print(myKnot)
 
-    # swap
-    swap = 0
-    myKnot.swapCrossing(swap)
-    print("\nAfter swapping {}".format(swap))
+    for p in myKnot.getKnotPaths():
+        print(p)
+
+    # smooth
+    smooth = 0
+    myKnot.smoothCrossing(smooth)
+    print("\nAfter smoothing {}".format(smooth))
     print(myKnot)
+
+    for p in myKnot.getKnotPaths():
+        print(p)
 
     # reduce
     myKnot.reduceR1s()
     print("\nAfter reducing")
     print(myKnot)
+
+    for p in myKnot.getKnotPaths():
+        print(p)
+
+    # swap
+    # swap = 1
+    # myKnot.swapCrossing(swap)
+    # print("\nAfter swapping {}".format(swap))
+    # print(myKnot)
+
+    
+
+    # # reduce
+    # myKnot.reduceR1s()
+    # print("\nAfter reducing")
+    # print(myKnot)
+
+
+    # # smooth
+    # smooth = 1
+    # myKnot.smoothCrossing(smooth)
+    # print("\nAfter smoothing {}".format(smooth))
+    # print(myKnot)
+
+    # # smooth
+    # smooth = 3
+    # myKnot.smoothCrossing(smooth)
+    # print("\nAfter smoothing {}".format(smooth))
+    # print(myKnot)
+
+    # # reduce
+    # myKnot.reduceR1s()
+    # print("\nAfter reducing")
+    # print(myKnot)
+    
+
+    # then test smooth 1 and reduce
+
+
+
+    # # swap
+    # swap = 0
+    # myKnot.swapCrossing(swap)
+    # print("\nAfter swapping {}".format(swap))
+    # print(myKnot)
+
+    # # reduce
+    # myKnot.reduceR1s()
+    # print("\nAfter reducing")
+    # print(myKnot)
 
     # # remove
     # remove = 0
