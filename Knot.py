@@ -1,4 +1,4 @@
-from sympy import symbols, Matrix
+from sympy import symbols, Matrix, expand
 from random import choice
 import copy
 import json
@@ -13,7 +13,10 @@ class Knot:
     
 
     def __str__(self):
-        s = "---- Knot {}----\n".format("{} ".format(self.name))
+        s = "---- Knot {}({}) ----\n".format(
+            "{} ".format(self.name),
+            hex(id(self))
+        )
         s += "Crossings:\n"
         for i, c in enumerate(self.ijkCrossings):
             s += "  {}: {}\n".format(i, c)
@@ -279,81 +282,13 @@ class Knot:
         self.handedness[c] = None
 
     # return a duplicated version of this knot (optionally named)
-    def duplicate(self, name=""):
-        return Knot(self.ijkCrossings, self.ijkCrossingNs, self.handedness, self.numUnknots, name)
-
-    # internal recursive function for computing homfly
-    def _homfly(self, k, l, m, distCrossing=None):
-        print("{}: computing HOMFLY:".format(k.name))
-        print(k)
-
-        # reduce all R1 crossings out of our knot
-        k.reduceR1s()
-        k.name += "r"
-        print(k)
-
-        # base case: k is an unlink of n components
-        if k.isUnlink():
-            n = k.numUnknots
-            poly = (-m**-1)**(n-1) * (l + l**(-1))**(n-1)
-            print("{}: hit basecase, n={}:  {}".format(k.name, n, poly))
-            return poly
-
-        # get our distinguished crossing if not given
-        if distCrossing is None:
-            validCrossings = [i for i, c in enumerate(k.ijkCrossings) if c is not None]
-            distCrossing = validCrossings[0]
-        isRight = {'right': True, 'left': False}[k.handedness[distCrossing]]
-        # print("{}: distinguished crossing {} ({} handed)".format(k.name, distCrossing, "right" if isRight else "left"))
-            
-        # copy knot and modify accordingly
-        kR, kL, kS = k.duplicate(), k.duplicate(), k.duplicate()
-        if isRight:
-            print("{}: swapping '{}' from right to left".format(k.name, distCrossing))
-            kL.swapCrossing(distCrossing)
-        else:
-            print("{}: swapping '{}' from left to right".format(k.name, distCrossing))
-            kR.swapCrossing(distCrossing)
-        print("{}: smoothing '{}'".format(k.name, distCrossing))
-        kS.smoothCrossing(distCrossing)
-
-        # assign new names
-        kR.name += "r"
-        kL.name += "l"
-        kS.name += "s"
-
-        print("Right Handed: ")
-        print(kR)
-        print("Left Handed: ")
-        print(kL)
-        print("Smoothed: ")
-        print(kS)
-
-        # compute necessary polynomials
-        # if isRight:
-        #     pL = self._homfly(kL, l, m)
-        #     print("{}: solved: {}".format(kL.name, pL))
-        # else:
-        #     pR = self._homfly(kR, l, m)
-        #     print("{}: solved: {}".format(kR.name, pR))
-        # pS = self._homfly(kS, l, m)
-        # print("{}: solved: {}".format(kS.name, pS))
-
-        # # return equation solved for the correct polynomial
-        # if isRight:
-        #     v = (-m * pS - l**-1 * pL) * l**-1
-        # else:
-        #     v = (-m * pS - l * pR) * l
-        # print("{}: returning {}".format(k.name, v))
-        # return v
-
-    # recursively compute the homfly polynomial
-    def computeHomfly(self):
-
-        # share symbols with all new knots' equations
-        l, m = symbols("l m")
-
-        return self._homfly(self.duplicate(name="K"), l, m)
+    def duplicate(self, name=None):
+        return Knot(
+            copy.deepcopy(self.ijkCrossings),
+            copy.deepcopy(self.handedness),
+            self.numUnknots,
+            self.name if name is None else name
+        )
 
     # return all arcs in given knot diagram
     def getArcs(self):
@@ -445,7 +380,84 @@ class Knot:
                     myPaths.append(path)
                     break
         return myPaths
+
+
+    # internal recursive function for computing homfly
+    def _homfly(self, k, l, m, distCrossing=None):
+        print("{}: computing HOMFLY:".format(k.name))
+
+        # reduce all R1 crossings out of our knot
+        # ------------ remove this if statement after testing --------- #
+        if k.name != "K":
+            k.reduceR1s()
+            k.name += "m"
+            print()
+            print(k)
+
+        # base case: k is an unlink of n components
+        if k.isUnlink():
+            n = k.numUnknots
+            poly = (-m**-1)**(n-1) * (l + l**(-1))**(n-1)
+            print("{}: hit basecase, n={}:  {}".format(k.name, n, poly))
+            return poly
+
+        # get our distinguished crossing if not given
+        if distCrossing is None:
+            validCrossings = [i for i, c in enumerate(k.ijkCrossings) if c is not None]
+            distCrossing = validCrossings[0]
+        isRight = {'right': True, 'left': False}[k.handedness[distCrossing]]
         
+        # copy knot, append modification to name
+        kR, kL, kS = k.duplicate(), k.duplicate(), k.duplicate()
+        kR.name += "r"
+        kL.name += "l"
+        kS.name += "s"
+
+        # modify accordingly
+        if isRight:
+            print("{}: swapping '{}' from right to left to get {}".format(k.name, distCrossing, kL.name))
+            kL.swapCrossing(distCrossing)
+        else:
+            print("{}: swapping '{}' from left to right to get {}".format(k.name, distCrossing, kR.name))
+            kR.swapCrossing(distCrossing)
+        print("{}: smoothing '{}' to get {}".format(k.name, distCrossing, kS.name))
+        kS.smoothCrossing(distCrossing)
+
+        print()
+        if isRight:
+            print(kL)
+        else:
+            print(kR)
+        print(kS)
+
+        # compute necessary polynomials
+        if isRight:
+            pL = self._homfly(kL, l, m)
+            print("{}: solved: {}".format(kL.name, pL))
+        else:
+            pR = self._homfly(kR, l, m)
+            print("{}: solved: {}".format(kR.name, pR))
+        pS = self._homfly(kS, l, m)
+        print("{}: solved: {}".format(kS.name, pS))
+
+        # return equation solved for the correct polynomial
+        if isRight:
+            v = (-m * pS - l**-1 * pL) * l**-1
+        else:
+            v = (-m * pS - l * pR) * l
+        ex = expand(v)
+        print("{}: returning {} => {}".format(k.name, v, ex))
+        return ex
+
+    # recursively compute the homfly polynomial
+    def computeHomfly(self):
+
+        # share symbols with all new knots' equations
+        l, m = symbols("l m")
+
+        return self._homfly(self.duplicate(name="K"), l, m)
+
+
 if __name__ == "__main__":
     # figure 8 knot for testing
     ijkCrossings = [
@@ -458,32 +470,53 @@ if __name__ == "__main__":
 
     myKnot = Knot(ijkCrossings, handedness)
 
-    print("original: ")
-    print(myKnot)
 
-    print(myKnot.getR1Crossing())
 
-    # smooth
-    smooth = 0
-    myKnot.smoothCrossing(smooth)
-    print("\nAfter smoothing {}".format(smooth))
-    print(myKnot)
+    print(myKnot.computeHomfly())
 
-    # reduce
-    myKnot.reduceR1s()
-    print("\nAfter reducing")
-    print(myKnot)
 
-    # swap
-    swap = 1
-    myKnot.swapCrossing(swap)
-    print("\nAfter swapping {}".format(swap))
-    print(myKnot)
 
-    # reduce
-    myKnot.reduceR1s()
-    print("\nAfter reducing")
-    print(myKnot)
+
+
+
+
+
+
+
+    # print("original: ")
+    # print(myKnot)
+
+    # # swap
+    # swap = 0
+    # myKnot.swapCrossing(swap)
+    # print("\nAfter swapping {}".format(swap))
+    # print(myKnot)
+
+    # print(myKnot.getR1Crossing())
+
+
+
+    # # smooth
+    # smooth = 0
+    # myKnot.smoothCrossing(smooth)
+    # print("\nAfter smoothing {}".format(smooth))
+    # print(myKnot)
+
+    # # reduce
+    # myKnot.reduceR1s()
+    # print("\nAfter reducing")
+    # print(myKnot)
+
+    # # swap
+    # swap = 1
+    # myKnot.swapCrossing(swap)
+    # print("\nAfter swapping {}".format(swap))
+    # print(myKnot)
+
+    # # reduce
+    # myKnot.reduceR1s()
+    # print("\nAfter reducing")
+    # print(myKnot)
 
 
     # # smooth
