@@ -68,6 +68,11 @@ keeping arc neighbors would do this too.
 - a lot of problems actually arise when dealing with a twisted unknot
 
 - SO MUCH EASIER::::::::::::::: can model swappings, smooths, deletions using psudo switch moves
+
+
+- R1 also became R2 whoopsies
+
+- Doing HOMFLY intorducted needing to deal with links
 ## Credit:
 # StackOverflow
  - 

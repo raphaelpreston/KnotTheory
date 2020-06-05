@@ -161,22 +161,61 @@ class Knot:
             # it's an r1 crossing if, for some path that that it belongs to,
             # for all other knots, that we intersect with, our knot goes over or under
         
+        # check if there are R1 crossings to resolve between links
+        inters = {} # path 1 => path2: way it crosses over
         for c in range(len(self.ijkCrossings)):
             if self.ijkCrossings[c] is not None:
+
                 # get all knots this crossing belongs to
-                paths = self.getKnotPaths()
-                
+                myPaths = self.getCrossingPaths(c)
+
+                # check all of crossing's paths against each other
+                for path1Ind, path1 in enumerate(myPaths):
+                    # keep track of each path we hit and whether we go under or over
+                    for path2Ind, path2 in enumerate(myPaths):
+                        if path1 != path2: # two paths intersect at crossing c
+                            # convert both paths to over/under style
+                            p1C = {
+                                cr: "over" if myDir in ['i0', 'i1'] else "under"
+                                for cr, myDir in path1
+                            }
+                            # crossings with a loop will be overriden but that's okay,
+                            # crossings with a loop can't be a link
+
+                            print()
+                            print("Crossing {}".format(c))
+                            print("Path1: {}".format(path1))
+                            print("path2: {}".format(path2))
+                            print("...crossing goes {}".format(p1C[c]))
+                            print()
+                            
+                            if path1Ind in inters:
+                                inters[path1Ind][path2Ind].append((c, p1C[c]))
+                            else:
+                                inters[path1Ind] = {path2Ind: [(c, p1C[c])]}
+        print("All intersections:")
+        print(json.dumps(inters, indent=2))
+
+        # check any intersections
+        for path1Ind, path1 in inters.items():
+            for path2Ind, cs in path1.items():
+                styles = [style for _, style in cs]
+                if all([style == styles[0] for style in styles]):
+                    print("DETECTED::: You can move paths {} and {} apart".format(path1Ind, path2Ind))
+                    # any shared crossing between the paths can be removed
+                    return cs[0][0]
+
+
+        # if you can't move links apart, then any R1 moves will be twisted, 
+        # and we can detect as follows
         
         # check each crossing
         for c in range(len(self.ijkCrossings)):
             if self.ijkCrossings[c] is not None:
                 for myDir in ['i0', 'i1']: # try both directions
                     betweens = self.getCrossingsBetween(c, c, myDir)
-                    if len(betweens) == 1: # special case we have a link
-                        # get all crossings on this entire extended arc
+                    if len(betweens) == 1: # link R2 crossings already ruled out
                         print("SPECIAL CASE LINK:")
-                        print(self.getCrossingsBetween(c, c, myDir, forceToTip=True))
-
                     else:
                         # test if they're all over or all under
                         allOver = all([myType == "over" for _, myType in betweens])
@@ -225,8 +264,10 @@ class Knot:
             return
         i0, i1, j, k = crossing['i0'], crossing['i1'], crossing['j'], crossing['k']
 
-        # this crossing could be the only one left on its knot
-        if len(set([i0, i1, j, k])) == 2: # simply increase unknots
+        # increase unknots
+        if i0 == i1 and j == k: # last connection btwn two links
+            self.numUnknots += 2
+        if i0 == k and i1 == j: # just a twisted unknot
             self.numUnknots += 1
         else:
             # if it's just a single loop, we want to take the correct j/k and
@@ -407,6 +448,16 @@ class Knot:
         
         return uniques
 
+    # returns all paths that a given crossing belongs to
+    def getCrossingPaths(self, c):
+        myPaths = []
+        for path in self.getKnotPaths():
+            for cr, _ in path:
+                if cr == c:
+                    myPaths.append(path)
+                    break
+        return myPaths
+        
 if __name__ == "__main__":
     # figure 8 knot for testing
     ijkCrossings = [
@@ -422,8 +473,10 @@ if __name__ == "__main__":
     print("original: ")
     print(myKnot)
 
-    for p in myKnot.getKnotPaths():
-        print(p)
+    print(myKnot.getR1Crossing())
+
+    # for p in myKnot.getKnotPaths():
+    #     print(p)
 
     # smooth
     smooth = 0
@@ -431,16 +484,53 @@ if __name__ == "__main__":
     print("\nAfter smoothing {}".format(smooth))
     print(myKnot)
 
-    for p in myKnot.getKnotPaths():
-        print(p)
+    print(myKnot.getR1Crossing())
 
-    # reduce
-    myKnot.reduceR1s()
-    print("\nAfter reducing")
+    # remove
+    remove = 2
+    myKnot.removeCrossing(remove)
+    print("\nAfter removing {}".format(remove))
     print(myKnot)
 
-    for p in myKnot.getKnotPaths():
-        print(p)
+    print(myKnot.getR1Crossing())
+
+    # swap
+    swap = 1
+    myKnot.swapCrossing(swap)
+    print("\nAfter swapping {}".format(swap))
+    print(myKnot)
+
+    print(myKnot.getR1Crossing())
+
+    # remove
+    remove = 1
+    myKnot.removeCrossing(remove)
+    print("\nAfter removing {}".format(remove))
+    print(myKnot)
+
+    print(myKnot.getR1Crossing())
+
+    # remove
+    remove = 3
+    myKnot.removeCrossing(remove)
+    print("\nAfter removing {}".format(remove))
+    print(myKnot)
+
+
+
+    # for p in myKnot.getKnotPaths():
+    #     print(p)
+
+    # # reduce
+    # myKnot.reduceR1s()
+    # print("\nAfter reducing")
+    # print(myKnot)
+
+    # print(myKnot.getR1Crossing())
+
+
+    # for p in myKnot.getKnotPaths():
+    #     print(p)
 
     # swap
     # swap = 1
