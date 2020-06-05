@@ -181,29 +181,19 @@ class Knot:
                             }
                             # crossings with a loop will be overriden but that's okay,
                             # crossings with a loop can't be a link
-
-                            print()
-                            print("Crossing {}".format(c))
-                            print("Path1: {}".format(path1))
-                            print("path2: {}".format(path2))
-                            print("...crossing goes {}".format(p1C[c]))
-                            print()
                             
                             if path1Ind in inters:
                                 inters[path1Ind][path2Ind].append((c, p1C[c]))
                             else:
                                 inters[path1Ind] = {path2Ind: [(c, p1C[c])]}
-        print("All intersections:")
-        print(json.dumps(inters, indent=2))
 
         # check any intersections
         for path1Ind, path1 in inters.items():
             for path2Ind, cs in path1.items():
                 styles = [style for _, style in cs]
                 if all([style == styles[0] for style in styles]):
-                    print("DETECTED::: You can move paths {} and {} apart".format(path1Ind, path2Ind))
                     # any shared crossing between the paths can be removed
-                    return cs[0][0]
+                    return cs[0][0], [], None, None
 
 
         # if you can't move links apart, then any R1 moves will be twisted, 
@@ -214,9 +204,7 @@ class Knot:
             if self.ijkCrossings[c] is not None:
                 for myDir in ['i0', 'i1']: # try both directions
                     betweens = self.getCrossingsBetween(c, c, myDir)
-                    if len(betweens) == 1: # link R2 crossings already ruled out
-                        print("SPECIAL CASE LINK:")
-                    else:
+                    if len(betweens) != 1: # link R2 crossings already ruled out
                         # test if they're all over or all under
                         allOver = all([myType == "over" for _, myType in betweens])
                         allUnder = all([myType == "under" for _, myType in betweens])
@@ -475,24 +463,16 @@ if __name__ == "__main__":
 
     print(myKnot.getR1Crossing())
 
-    # for p in myKnot.getKnotPaths():
-    #     print(p)
-
     # smooth
     smooth = 0
     myKnot.smoothCrossing(smooth)
     print("\nAfter smoothing {}".format(smooth))
     print(myKnot)
 
-    print(myKnot.getR1Crossing())
-
-    # remove
-    remove = 2
-    myKnot.removeCrossing(remove)
-    print("\nAfter removing {}".format(remove))
+    # reduce
+    myKnot.reduceR1s()
+    print("\nAfter reducing")
     print(myKnot)
-
-    print(myKnot.getR1Crossing())
 
     # swap
     swap = 1
@@ -500,50 +480,10 @@ if __name__ == "__main__":
     print("\nAfter swapping {}".format(swap))
     print(myKnot)
 
-    print(myKnot.getR1Crossing())
-
-    # remove
-    remove = 1
-    myKnot.removeCrossing(remove)
-    print("\nAfter removing {}".format(remove))
+    # reduce
+    myKnot.reduceR1s()
+    print("\nAfter reducing")
     print(myKnot)
-
-    print(myKnot.getR1Crossing())
-
-    # remove
-    remove = 3
-    myKnot.removeCrossing(remove)
-    print("\nAfter removing {}".format(remove))
-    print(myKnot)
-
-
-
-    # for p in myKnot.getKnotPaths():
-    #     print(p)
-
-    # # reduce
-    # myKnot.reduceR1s()
-    # print("\nAfter reducing")
-    # print(myKnot)
-
-    # print(myKnot.getR1Crossing())
-
-
-    # for p in myKnot.getKnotPaths():
-    #     print(p)
-
-    # swap
-    # swap = 1
-    # myKnot.swapCrossing(swap)
-    # print("\nAfter swapping {}".format(swap))
-    # print(myKnot)
-
-    
-
-    # # reduce
-    # myKnot.reduceR1s()
-    # print("\nAfter reducing")
-    # print(myKnot)
 
 
     # # smooth
