@@ -5,11 +5,33 @@ import json
 
 
 class Knot:
-    def __init__(self, ijkCrossings, handedness, numUnknots=0, name=""):
+    def __init__(self, ijkCrossings, handedness, numUnknots=0, name="", ijkCrossingNs=None):
+        print() #######################
+        # convert from i, j, k crossings into i0, i1, j, k 
+        nextNum = len(ijkCrossings) # number of arcs is same as number of crossings
+        if ijkCrossingNs is not None:
+            # for every crossing
+            for c in range(len(ijkCrossings)):
+                # get i0 neighbor and the incoming direction into said neighbor
+                i = ijkCrossings[c]['i']
+                i0N, i0NIncDir = ijkCrossingNs[c]['i0']
+
+                # update self
+                ijkCrossings[c]['i0'] = nextNum
+                ijkCrossings[c]['i1'] = i
+                del ijkCrossings[c]['i']
+
+                # update neighbor behind me
+                ijkCrossings[i0N][i0NIncDir] = nextNum
+
+                nextNum += 1
+        
         self.ijkCrossings = ijkCrossings
         self.handedness = handedness
         self.numUnknots = numUnknots
         self.name = name
+
+        
     
 
     def __str__(self):
@@ -287,7 +309,7 @@ class Knot:
             copy.deepcopy(self.ijkCrossings),
             copy.deepcopy(self.handedness),
             self.numUnknots,
-            self.name if name is None else name
+            name=self.name if name is None else name
         )
 
     # return all arcs in given knot diagram
@@ -459,6 +481,8 @@ class Knot:
 
 
 if __name__ == "__main__":
+    from KnotCanvas import main
+    main()
     # # figure 8 knot
     # ijkCrossings = [
     #     {'i0': 3, 'i1': 4, 'j': 6, 'k': 7},
@@ -469,16 +493,16 @@ if __name__ == "__main__":
     # handedness = ['left', 'right', 'left', 'right']
 
     # trefoil
-    ijkCrossings = [
-        {'i0': 2, 'i1': 3, 'j': 5, 'k': 0},
-        {'i0': 0, 'i1': 1, 'j': 3, 'k': 4},
-        {'i0': 4, 'i1': 5, 'j': 1, 'k': 2},
-    ]
-    handedness = ['right', 'right', 'right']
+    # ijkCrossings = [
+    #     {'i0': 2, 'i1': 3, 'j': 5, 'k': 0},
+    #     {'i0': 0, 'i1': 1, 'j': 3, 'k': 4},
+    #     {'i0': 4, 'i1': 5, 'j': 1, 'k': 2},
+    # ]
+    # handedness = ['right', 'right', 'right']
 
-    myKnot = Knot(ijkCrossings, handedness)
+    # myKnot = Knot(ijkCrossings, handedness)
 
-    print(myKnot.computeHomfly())
+    # print(myKnot.computeHomfly())
 
 
 

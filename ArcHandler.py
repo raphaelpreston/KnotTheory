@@ -39,6 +39,10 @@ class ArcHandler:
         crossingsSeen = set()
         handedness = [] # reset
         # for each arcNum
+        print("cROSSINGS:")
+        for c in self.crossings:
+            print(c)
+
         for myArcNum, data in enumerate(self.crossings):
             # for each arc it connects to
             for myEp, otherEp in data.items():

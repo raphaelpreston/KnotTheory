@@ -1,11 +1,13 @@
 from LineFinder import *
 from random import randint, choice
+import sys
 from math import sin, cos, radians, sqrt
 import DrawTools as dtools
 import ImageTools as itools
 import AlexPolyTools as APolTools
 
 from ArcHandler import *
+from Knot import Knot
 from PyQt5.QtGui import QPainter, QColor, QPen
 from PyQt5.QtCore import Qt, QTimer
 from colour import Color
@@ -165,12 +167,23 @@ class KnotHandler(): # TODO: delete self variables for certain steps once they'r
                 print("Handedness")
                 print(handedness)
 
-                print("------------- Alexander Polynomial -------------")
-                alexPoly = APolTools.compute(ijkCrossings, handedness)
-                print("Alex Polynomial:")
-                print(alexPoly)
+                myKnot = Knot(ijkCrossings, handedness, ijkCrossingNs=ijkCrossingNs)
+
+                print(myKnot)
 
                 print("-------------- HOMFLY Polynomial ---------------")
+                homflyPoly = myKnot.computeHomfly()
+                print(homflyPoly)
+
+                sys.exit()
+
+
+                # print("------------- Alexander Polynomial -------------")
+                # alexPoly = APolTools.compute(ijkCrossings, handedness)
+                # print("Alex Polynomial:")
+                # print(alexPoly)
+
+                # 
 
 
 

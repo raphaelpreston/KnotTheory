@@ -88,9 +88,11 @@ class KnotCanvas(QWidget):
     def draw(self, qp):
         self.kh.draw(qp) # draw stuff
 
-def main(): # ignore already declared error
+def main(filePath=None): # ignore already declared error
+    if filePath == None:
+        filePath = 'knots/figure8.png'
     app = QApplication(sys.argv)
-    ex = KnotCanvas('knots/tor.png', 10)
+    ex = KnotCanvas(filePath, 10)
     sys.exit(app.exec_())
 
     # TODO: add some functionality to tell if the endpoitn finding has failed (maybe original arc thickness)
