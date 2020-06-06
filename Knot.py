@@ -442,7 +442,7 @@ class Knot:
 
         # return equation solved for the correct polynomial
         if isRight:
-            v = (-m * pS - l**-1 * pL) * l**-1
+            v = (-m * pS - l**-1 * pL) / l
         else:
             v = (-m * pS - l * pR) * l
         ex = expand(v)
@@ -459,26 +459,26 @@ class Knot:
 
 
 if __name__ == "__main__":
-    # figure 8 knot for testing
+    # # figure 8 knot
+    # ijkCrossings = [
+    #     {'i0': 3, 'i1': 4, 'j': 6, 'k': 7},
+    #     {'i0': 5, 'i1': 6, 'j': 0, 'k': 1},
+    #     {'i0': 7, 'i1': 0, 'j': 2, 'k': 3},
+    #     {'i0': 1, 'i1': 2, 'j': 4, 'k': 5},
+    # ]
+    # handedness = ['left', 'right', 'left', 'right']
+
+    # trefoil
     ijkCrossings = [
-        {'i0': 3, 'i1': 4, 'j': 6, 'k': 7},
-        {'i0': 5, 'i1': 6, 'j': 0, 'k': 1},
-        {'i0': 7, 'i1': 0, 'j': 2, 'k': 3},
-        {'i0': 1, 'i1': 2, 'j': 4, 'k': 5},
+        {'i0': 2, 'i1': 3, 'j': 5, 'k': 0},
+        {'i0': 0, 'i1': 1, 'j': 3, 'k': 4},
+        {'i0': 4, 'i1': 5, 'j': 1, 'k': 2},
     ]
-    handedness = ['left', 'right', 'left', 'right']
+    handedness = ['right', 'right', 'right']
 
     myKnot = Knot(ijkCrossings, handedness)
 
-
-
     print(myKnot.computeHomfly())
-
-
-
-
-
-
 
 
 
