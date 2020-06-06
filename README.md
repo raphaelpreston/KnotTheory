@@ -35,6 +35,7 @@
  - draw a knot, take a pic, get a link to the knot on knotinfo (this would be the simplest form knot; then show info on the knot diagram itself)
  - https://math.okstate.edu/people/segerman/talks/drawing_knots.pdf
  
+ - currently, every crossing needs to have an i, j, and k. Not implied like an arc jumping over two arcs instead of one.
 
 ## To Connect Endpoints
  - check distance from the endpoints and the intersection (intersection should be relatively equadistant between endpoints)
@@ -44,6 +45,34 @@
  - when using first derivative to get slope, get as close as you can do perpendicular against the end boundary of the line
  - intersection likely to be near another line
 
+
+ - has a problem with small arcs for some reason
+ - assumption: i0 and j dirs must arrive at an i1 and i1, k dirs must arrive at i0 crossings
+
+ - alternative way to get incoming direction from c1 in dir to c2:
+ Get the endpoints of the arc in dir from c1. If the second (or first, depending 
+ on dir) is c2, then you know which way it's coming in to c2. The key is that you know that c1 and c2 are neighbors.
+
+
+- always trying to balance computation on the fly vs computation on changes, like with
+being able to quickly compute crossings between or keeping track of the "flipped" knot so that
+r1 crossing detection becomes trivial, it's the same arc on either one or the other.
+keeping arc neighbors would do this too.
+- probably would have been easier to represent each edge from a vertex to another as a distinct
+  "arc", even if the crossing is an "i". Then have a function to compute the "names" of the arcs
+  on the fly.
+ - the "path" is an exmple of something that's computed on the fly. useful for getting crossings inbetween two.
+- tough to figure out incoming dir for unknots or loops, there is background that you need about knots
+- propogate crossing change function?
+
+- a lot of problems actually arise when dealing with a twisted unknot
+
+- SO MUCH EASIER::::::::::::::: can model swappings, smooths, deletions using psudo switch moves
+
+
+- R1 also became R2 whoopsies
+
+- Doing HOMFLY intorducted needing to deal with links
 ## Credit:
 # StackOverflow
  - 

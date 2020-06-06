@@ -1,13 +1,19 @@
 from LineFinder import *
 from random import randint, choice
+import sys
 from math import sin, cos, radians, sqrt
 import DrawTools as dtools
 import ImageTools as itools
+import AlexPolyTools as APolTools
+
 from ArcHandler import *
+from Knot import Knot
 from PyQt5.QtGui import QPainter, QColor, QPen
 from PyQt5.QtCore import Qt, QTimer
 from colour import Color
 import json
+
+from PyQt5.QtWidgets import QApplication
 
 ARC_SEARCH_SHORTCUT = True
 ARC_EXPAND_SHORTCUT = True
@@ -19,13 +25,14 @@ EXTENSION_RADIUS = 5 # radius of rectangle that extends out of spine_end
 
 class KnotHandler(): # TODO: delete self variables for certain steps once they're done
     
-    def __init__(self, imageData, skelImageData, swapImgFunc):
+    def __init__(self, imageData, skelImageData, swapImgFunc, imageName, kill):
         
         # image data
         self.imageData = imageData
         self.skelImageData = skelImageData
         self.imageWidth = imageData.shape[1]
         self.imageHeight = imageData.shape[0]
+        self.imageName = imageName
 
         # callback to swap image being displayed from normal to skeleton
         self.swapImgFunc = swapImgFunc
@@ -126,7 +133,7 @@ class KnotHandler(): # TODO: delete self variables for certain steps once they'r
             self.spineExtensionPixelsToArc = dict() # extension pixel => set(endPoint, endPoint, ...)
         
         elif self.status == "spine-extension":
-            # test to see if all endPoints have intersected
+            # test to see if all endPoints have intersected; if so, we're done
             if self.ah.allEndpointsConnected():
                 for arcNum, data in enumerate(self.ah.crossings):
                     print("arc {} connections:".format(arcNum))
@@ -134,24 +141,66 @@ class KnotHandler(): # TODO: delete self variables for certain steps once they'r
                         print(" - {} ==> {}".format(ep1, ep2))
                 self.status = "done"
                 print(self.status)
-                # get crossings from Arc Handler
-                self.crossings = self.ah.crossings
-                # enumerate entire knot
-                self.knotEnumeration = self.ah.enumerateKnotLength()
-                if len(self.knotEnumeration) != len(self.ah.pixelSpines.keys()):
-                    print("Error: Enumeration ({}) and pixelSpines ({}) have different lengths".format(
-                        len(self.knotEnumeration), len(self.ah.pixelSpines.keys()
-                    )))
-                if any([len(ns) != 2 for pixel, ns in self.knotEnumeration.items()]):
-                    print("Error: A pixel doesn't have two neighbors.")
+
+                # enumerate entire knot, get ijkCrossings and handedness
+                self.ah.enumerateKnotLength()
+                self.ah.getIJKCrossingsAndHandedness()
+
+                self.knotEnumeration = self.ah.knotEnumeration
+                ijkCrossings = self.ah.ijkCrossings
+                handedness = self.ah.handedness
+                ijkCrossingNs = self.ah.ijkCrossingNs
+
+                # error check
+                if any([h != "left" and h != "right" for h in handedness]):
+                    print("Error: Handedness had an unrecognized value")
+                    print(handedness)
                     return
+
+                print("IJK Crossings:")
+                for ind, c in enumerate(ijkCrossings):
+                    print("{}: {}".format(ind, c))
+
+                print("IJK Crossing Neighbors:")
+                for ind, c in enumerate(ijkCrossingNs):
+                    print("{}: {}".format(ind, c))
+                
+
+                print("Handedness")
+                print(handedness)
+
+                myKnot = Knot(ijkCrossings, handedness, ijkCrossingNs=ijkCrossingNs)
+
+                print(myKnot)
+
+                print("-------------- HOMFLY Polynomial ---------------")
+                homflyPoly = myKnot.computeHomfly(latex=True, depthLim=50)
+
+                # write the homfly to our output file
+                with open("homfly_out.csv", 'a+') as f:
+                    f.write("{},{}\n".format(self.imageName, homflyPoly))
+                print(homflyPoly)
+
+                QApplication.quit()
+
+                # sys.exit()
+
+
+                # print("------------- Alexander Polynomial -------------")
+                # alexPoly = APolTools.compute(ijkCrossings, handedness)
+                # print("Alex Polynomial:")
+                # print(alexPoly)
+
+                # 
+
+
+
             else:
                 for pixel, endPoints in self.spineExtensionPixelsToArc.items():
                     endPoints = list(endPoints)
                     if len(endPoints) > 1:
                         if len(endPoints) > 2:
-                            print("Error: Multiple lines collided at the same time.")
-                            return
+                            raise Exception("Error: Multiple lines collided at the same time.")
                         # ensure we haven't already assigned a connection
                         if (self.ah.getEndPointPair(endPoints[0]) is None
                             and self.ah.getEndPointPair(endPoints[1]) is None):
@@ -177,7 +226,7 @@ class KnotHandler(): # TODO: delete self variables for certain steps once they'r
     def performTick(self):
 
         if self.status == "done":
-            return
+            pass
 
         # move our cursor in the search for arcs
         elif self.status == "arc-search":

@@ -9,7 +9,7 @@ from KnotHandler import *
 from skimage import io, color, morphology, img_as_float, img_as_uint
 from PyQt5.QtWidgets import QApplication, QMainWindow, QLabel, QGridLayout, QWidget
 from PyQt5.QtGui import QPixmap, QPainter, QColor, QFont, QPen
-from PyQt5.QtCore import Qt, QTimer
+from PyQt5.QtCore import Qt, QTimer, QCoreApplication
 
 QApplication.setAttribute(Qt.AA_EnableHighDpiScaling, True)
 
@@ -23,6 +23,9 @@ class KnotCanvas(QWidget):
         fileName = givenFilePath[lastSlash+1:]
         knotsPath = givenFilePath[:lastSlash]
         
+        skelFolder = "{}/skeletons/".format(knotsPath)
+        if not os.path.exists(skelFolder): # create if doesn't exist
+            os.makedirs(skelFolder)
         self.skelFilePath = "{}/skeletons/skeleton_{}.png".format(knotsPath, fileName)
         self.filePath = "{}/{}".format(knotsPath, fileName)
 
@@ -34,7 +37,8 @@ class KnotCanvas(QWidget):
 
         # declare class variables
         self.imageData = io.imread(self.filePath) # get image data with sci-kit
-        self.kh = KnotHandler(self.imageData, self.skelImageData, self.swapImage)
+        QCoreApplication.quit()
+        self.kh = KnotHandler(self.imageData, self.skelImageData, self.swapImage, fileName, QCoreApplication.quit)
 
         # add image background
         self.normalPixmap = QPixmap(self.filePath)
@@ -88,13 +92,22 @@ class KnotCanvas(QWidget):
     def draw(self, qp):
         self.kh.draw(qp) # draw stuff
 
-def main(): # ignore already declared error
+def main(filePath=None): # ignore already declared error
+    if filePath == None:
+        filePath = 'local_knot_data/5_1.png'
     app = QApplication(sys.argv)
-    ex = KnotCanvas('knots/hand.png', 10000)
-    sys.exit(app.exec_())
+    ex = KnotCanvas(filePath, 10)
+
+    # sys.exit(app.exec_())
+    app.exec_()
 
     # TODO: add some functionality to tell if the endpoitn finding has failed (maybe original arc thickness)
     # TODO: fix multiple spines
 
 if __name__ == '__main__':
-    main()
+    try:
+        main()
+    except Exception as e:
+        print("excepted here!!1111111111111111111")
+    finally:
+        print("herelkjasljfaklsj")

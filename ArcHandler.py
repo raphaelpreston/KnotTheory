@@ -9,7 +9,11 @@ from random import sample
 POINTS_TO_CUT = 5
 
 # number of points towards the endpoint to be used for linear regression
-POINTS_FOR_LINREG = 20
+POINTS_FOR_LINREG = 5
+
+# (traveled, not absolute), length of line created by the pixels on i to get
+# handedness of crossing
+I_LINE_LEN = 10
 
 class ArcHandler:
     def __init__(self):
@@ -22,8 +26,228 @@ class ArcHandler:
         self.spineEndPoints = [] # for each arc, list of endpoints
         self.snippedSpinePixs = set() # spine pixels that have been snipped off
         self.crossings = [] # arcNum => {endPoint => endPoint (of other arc)}
+        self.knotEnumeration = None # spinePixel => {"next": piexl, "prev": pixel}
+        self.ijkCrossings = None # crossingNumber => {"i": {arcNum}, "j"..., "k"...}
+        self.ijkCrossingNs = [] # {[i: {next, prev}, j: {next, prev}...}
+        self.handedness = [] # "left" or "right"
 
-    # returns a linked list of the entire length of the knot
+    # figures out ijkCrossings, handedness. crossing numbers are in a cyclical
+    # order. requires that self.knotEnumeration exists
+    def getIJKCrossingsAndHandedness(self):
+        ijkTuples = [] # tuples of (i,j,k), same order as ijkPoints
+        ijkPoints = [] # tuples of (iPoint, jEndPoint, kEp)
+        crossingsSeen = set()
+        handedness = [] # reset
+        # for each arcNum
+        print("cROSSINGS:")
+        for c in self.crossings:
+            print(c)
+
+        for myArcNum, data in enumerate(self.crossings):
+            # for each arc it connects to
+            for myEp, otherEp in data.items():
+
+                # skip if we've seen it before
+                if (myEp, otherEp) in crossingsSeen or \
+                        (otherEp, myEp) in crossingsSeen:
+                    continue
+
+                crossingsSeen.add((myEp, otherEp))
+                otherArcNum = self.getPixelArc(otherEp)
+
+                # figure out which arc is between the endpoints
+                # use rectangle because lines might cross without intersecting
+                # diagonally
+                pixelsBetween = itools.getRectangle(myEp, otherEp, 2)
+                spinesBetween = set()
+                pixsOnI = set() # keep track of pixels on i's spine btwn j & k
+                for pix in pixelsBetween:
+                    if self.pixelHasSpine(pix):
+                        spineNum = self.getPixelSpine(pix)
+                        if spineNum != myArcNum and spineNum != otherArcNum:
+                            spinesBetween.add(spineNum)
+                            pixsOnI.add(pix)
+                if len(spinesBetween) != 1:
+                    print("Error: There were more or less than 1 arc between {} and {}".format(myEp, otherEp))
+                    print("Arcs: {}".format(spinesBetween))
+                    print("Pixels between: {}".format(pixelsBetween))
+                    return
+                spinesBetween = list(spinesBetween)
+                
+                # enumerate i, j, and k; crossing numbers assigned arbitrarily
+                myEpNext = self.knotEnumeration[myEp]["next"]
+                myEpPrev = self.knotEnumeration[myEp]["prev"]
+                i = spinesBetween[0]
+                if otherEp == myEpNext: # goes from myEp to otherEp
+                    j, k = myArcNum, otherArcNum
+                    jEp, kEp = myEp, otherEp
+                elif otherEp == myEpPrev: # goes from otherEp to myEp
+                    k, j = myArcNum, otherArcNum
+                    jEp, kEp = otherEp, myEp
+                else:
+                    print("Error: Supposed EP connection wasn't in any neighbors")
+                    return
+                
+                # get i point between j and k endpoints
+                iPoint = pixsOnI.pop() # arbitrary
+
+                # record the i,j,k values and relevent points
+                ijkTuples.append((i, j, k))
+                ijkPoints.append((iPoint, jEp, kEp))
+                
+                # figure out handedness
+                # traverse both ways down i to form imaginary line
+                nextN = self.knotEnumeration[iPoint]["next"]
+                prevN = self.knotEnumeration[iPoint]["prev"]
+                posLine = [iPoint, nextN]
+                negLine = [prevN]
+                currPixs = [nextN, prevN]
+                done = False
+                while not done:
+                    nextsUp = []
+                    # for each pixel
+                    for currPix in currPixs:
+                        # get the neighbor in its appropriate direction
+                        myDir = "next" if currPix in posLine else "prev"
+                        nextN = self.knotEnumeration[currPix][myDir]
+                        # add it to the appropriate directional line
+                        if myDir == "next":
+                            posLine.append(nextN)
+                        else:
+                            negLine.append(nextN)
+                        # check if we've added enough pixels to the line
+                        if len(posLine) + len(negLine) == I_LINE_LEN:
+                            done = True
+                            break
+                        nextsUp.append(nextN)
+                    currPixs = nextsUp
+                
+                # line will become last point of neg dir to last of pos
+                p1 = negLine[-1]
+                p2 = posLine[-1]
+
+                # determine on which side of the line on i lies j
+                pixelOnSide = itools.pixelOnSide(p1, p2, jEp)
+                if pixelOnSide == None:
+                    print("Error: pixel {} is on the line".format(jEp))
+                    return
+                # appending to handedness does preserve order
+                handedness.append(pixelOnSide)
+        # convert into ijkCrossings
+        ijkCrossings = []
+        for i, j, k in ijkTuples:
+            ijkCrossings.append({"i": i, "j": j, "k": k})
+
+
+        allCrossingPoints = set([p for points in ijkPoints for p in points])
+        # return three dictionaries that map i, j, and k points
+        # to their crossing numbers. accepts an ijkpoints dict
+        def getIJKDicts(myIJKCrossings, myIJKPoints):
+            jDict = dict()
+            kDict = dict()
+            iDict = dict()
+            for crossingNum in range(len(myIJKPoints)): # for each crossing num
+                iPoint, jEp, kEp = myIJKPoints[crossingNum]
+                iDict[iPoint] = crossingNum
+                jDict[jEp] = crossingNum
+                kDict[kEp] = crossingNum
+            if len(jDict) + len(kDict) \
+                    + len(iDict) != len(allCrossingPoints):
+                print("Error: Length of all points differs from allCrossingPoints")
+                return
+            return iDict, jDict, kDict
+
+
+        # begin process of sorting crossings cyclicly
+        # for simplicity, record all j points and map j points to unsorted
+        # version of ijkPoints
+        allJs = set([jEp for (_, jEp, _) in ijkPoints])
+        _, jEpToCrossingNum, _ = (
+            getIJKDicts(ijkCrossings, ijkPoints)
+        )
+
+        # given a crossing, return the next crossing in a cyclical order
+        # that is, the crossing whos 'j' is the closest pixel in the "next" dir
+        # operates on unsorted ijkPoints
+        def nextCyclicalCrossing(crossingNum):
+            # get k of current crossing number
+            _, _, currentKEp = ijkPoints[crossingNum]
+
+            # find the next "j" pixel
+            currPix = self.knotEnumeration[currentKEp]['next']
+            while currPix not in allJs: # have yet to reach a j pixel
+                currPix = self.knotEnumeration[currPix]['next']
+            
+            # get the crossing number for that 'j' pixel
+            return jEpToCrossingNum[currPix]
+        
+        # travel around knot and record all crossings in order
+        self.ijkCrossings = [] # sorted versions
+        self.handedness = []
+        self.ijkPoints = []
+        currCrossing = 0 # arbitrary beginning
+        while len(self.handedness) < len(handedness):
+             # add this crossing as the next in line in the sorted versions
+            self.ijkCrossings.append(ijkCrossings[currCrossing])
+            self.handedness.append(handedness[currCrossing])
+            self.ijkPoints.append(ijkPoints[currCrossing])
+            # proceed
+            currCrossing = nextCyclicalCrossing(currCrossing)
+        
+        # now that everything's sorted, we can get neighbors from each crossing
+        # for simplicity, record all crossing points,
+        # REMAP i, j & k points to crossing nums (using sorted versions now)
+        iPointToCrossingNum, jEpToCrossingNum, kEpToCrossingNum = (
+            getIJKDicts(self.ijkCrossings, self.ijkPoints)
+        )
+        
+        # given a crossing index, return the neighbor crossing in a direction
+        # from the given arcType of the crossing, requires sorted self.ijkPoints
+        # also returns direction in which we arrived to the neighbor
+        def getCrossingNInDir(crossingIndex, arcType, myDir):
+            # get our starting pixel
+            iPoint, jEp, kEp = self.ijkPoints[crossingIndex]
+            if arcType == 'i':
+                sourcePix = iPoint
+            elif arcType == 'j':
+                sourcePix = jEp
+            elif arcType == 'k':
+                sourcePix = kEp
+            
+            # travel forward and hit another crossing
+            currPix = self.knotEnumeration[sourcePix][myDir]
+            while currPix not in allCrossingPoints:
+                currPix = self.knotEnumeration[currPix][myDir]
+            # currPix is not some i, j, k pixel of another crossing
+            if currPix in jEpToCrossingNum:
+                return jEpToCrossingNum[currPix], 'j'
+            elif currPix in kEpToCrossingNum:
+                return kEpToCrossingNum[currPix], 'k'
+            elif currPix in iPointToCrossingNum:
+                # i0 and j dirs must arrive at an i1 and i1, k dirs must arrive
+                # at i0 crossings
+                iModified = {'i0': 'i1', 'j': 'i1', 'i1': 'i0', 'k': 'i0'}[arcType]
+                return iPointToCrossingNum[currPix], iModified
+        
+        # begin process of getting neighbors
+        self.ijkCrossingNs = [None for _ in handedness] # {[i: {next, prev}, j: {next, prev}...}
+        # travel around again and note all neighbors
+        for currCrossing in range(len(self.handedness)):
+            # get immediate neighbors from all i, j, k in both directions
+            # and get the way that our crossing arrived to neighbor crossing in that dir
+            
+            crossingNs = {
+                # both next and prev for i
+                'i0': getCrossingNInDir(currCrossing, 'i', 'prev'),
+                'i1': getCrossingNInDir(currCrossing, 'i', 'next'),
+                'j': getCrossingNInDir(currCrossing, 'j', 'prev'),
+                'k': getCrossingNInDir(currCrossing, 'k', 'next')
+            }
+
+            self.ijkCrossingNs[currCrossing] = crossingNs
+
+
+    # returns a doubly linked list of the entire length of the knot
     def enumerateKnotLength(self):
         # helper function to return next pixel and new direction to travel in
         def nextPixelAndDirKey(currPixel, currDirKey):
@@ -50,8 +274,9 @@ class ArcHandler:
                     currDirKey = "prev" if currDirKey == "next" else "next"
             return nextPixels[0], currDirKey
 
-        # choose an random spine pixel
-        source = sample(self.pixelSpines.keys(), 1)[0]
+        # choose the first spine pixel
+        source = list(self.pixelSpines.keys())[0]
+        # print("Starting at source {}".format(source))
 
         # loop through until we hit source again
         nextPixel, currDirKey = nextPixelAndDirKey(source, None)
@@ -68,9 +293,22 @@ class ArcHandler:
                 "prev": lastPixel,
                 "next": nextPixel
             }
+            # print("Set {}'s {} to {}".format(currPixel, "prev", lastPixel))
+            # print("Set {}'s {} to {}".format(currPixel, "next", nextPixel))
         # nextPixel is now source
         enumeration[source]['prev'] = currPixel
-        return enumeration
+        # print("Finally, set {}'s {} to {}".format(source, "prev", currPixel))
+
+        # error check
+        if len(enumeration) != len(self.pixelSpines.keys()):
+            print("Error: Enumeration ({}) and pixelSpines ({}) have different lengths".format(
+                len(enumeration), len(self.pixelSpines.keys()
+            )))
+        if any([len(ns) != 2 for pixel, ns in enumeration.items()]):
+            print("Error: A pixel doesn't have two neighbors.")
+            return
+        
+        self.knotEnumeration = enumeration
     
     # returns true if all spine endpoints have pairs
     def allEndpointsConnected(self):
@@ -158,6 +396,10 @@ class ArcHandler:
         self.spineEndPoints[arcNum] = None # reset endpoints
         self.arcSpinePixels[arcNum].add(pixel) # arc => pixel
         self.pixelSpines[pixel] = arcNum # pixel => arc
+
+
+    def getPixelSpine(self, pixel):
+        return self.pixelArcs[pixel]
 
     # set a pixel's relative position in its (implied) arc's spine
     # use this to set initial position in spine or edit it later
