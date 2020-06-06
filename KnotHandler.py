@@ -13,6 +13,8 @@ from PyQt5.QtCore import Qt, QTimer
 from colour import Color
 import json
 
+from PyQt5.QtWidgets import QApplication
+
 ARC_SEARCH_SHORTCUT = True
 ARC_EXPAND_SHORTCUT = True
 SPINE_SEARCH_SHORTCUT = True
@@ -23,14 +25,14 @@ EXTENSION_RADIUS = 5 # radius of rectangle that extends out of spine_end
 
 class KnotHandler(): # TODO: delete self variables for certain steps once they're done
     
-    def __init__(self, imageData, skelImageData, swapImgFunc):
+    def __init__(self, imageData, skelImageData, swapImgFunc, imageName, kill):
         
         # image data
         self.imageData = imageData
         self.skelImageData = skelImageData
         self.imageWidth = imageData.shape[1]
         self.imageHeight = imageData.shape[0]
-        # self.imageName = imageName
+        self.imageName = imageName
 
         # callback to swap image being displayed from normal to skeleton
         self.swapImgFunc = swapImgFunc
@@ -172,10 +174,16 @@ class KnotHandler(): # TODO: delete self variables for certain steps once they'r
                 print(myKnot)
 
                 print("-------------- HOMFLY Polynomial ---------------")
-                homflyPoly = myKnot.computeHomfly()
+                homflyPoly = myKnot.computeHomfly(latex=True, depthLim=50)
+
+                # write the homfly to our output file
+                with open("homfly_out.csv", 'a+') as f:
+                    f.write("{},{}\n".format(self.imageName, homflyPoly))
                 print(homflyPoly)
 
-                sys.exit()
+                QApplication.quit()
+
+                # sys.exit()
 
 
                 # print("------------- Alexander Polynomial -------------")

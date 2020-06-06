@@ -1,8 +1,11 @@
 from sympy import symbols, Matrix, expand
+from sympy import latex as latexForm
 from random import choice
 import copy
 import json
 
+class RecError(Exception):
+    pass
 
 class Knot:
     def __init__(self, ijkCrossings, handedness, numUnknots=0, name="", ijkCrossingNs=None):
@@ -403,18 +406,19 @@ class Knot:
                     break
         return myPaths
 
-
     # internal recursive function for computing homfly
-    def _homfly(self, k, l, m, distCrossing=None):
+    def _homfly(self, k, l, m, depth, depthLim, distCrossing=None):
         print("{}: computing HOMFLY:".format(k.name))
 
         # reduce all R1 crossings out of our knot
-        # ------------ remove this if statement after testing --------- #
-        if k.name != "K":
-            k.reduceR1s()
-            k.name += "m"
-            print()
-            print(k)
+        k.reduceR1s()
+        k.name += "m"
+        print()
+        print(k)
+
+        # reached recursion limit
+        if depth >= depthLim:
+            raise RecError("Reached recursion limit")
 
         # base case: k is an unlink of n components
         if k.isUnlink():
@@ -454,12 +458,12 @@ class Knot:
 
         # compute necessary polynomials
         if isRight:
-            pL = self._homfly(kL, l, m)
+            pL = self._homfly(kL, l, m, depth + 1, depthLim)
             print("{}: solved: {}".format(kL.name, pL))
         else:
-            pR = self._homfly(kR, l, m)
+            pR = self._homfly(kR, l, m, depth + 1, depthLim)
             print("{}: solved: {}".format(kR.name, pR))
-        pS = self._homfly(kS, l, m)
+        pS = self._homfly(kS, l, m, depth + 1, depthLim)
         print("{}: solved: {}".format(kS.name, pS))
 
         # return equation solved for the correct polynomial
@@ -472,12 +476,19 @@ class Knot:
         return ex
 
     # recursively compute the homfly polynomial
-    def computeHomfly(self):
+    # set latex to true to format it latex style
+    def computeHomfly(self, latex=False, depthLim=float('inf')):
 
         # share symbols with all new knots' equations
         l, m = symbols("l m")
 
-        return self._homfly(self.duplicate(name="K"), l, m)
+        try:
+            homfly = self._homfly(self.duplicate(name="K"), l, m, 0, depthLim)
+            return latexForm(homfly) if latex else homfly
+        except RecError:
+            return "Recursion Error"
+        except Exception:
+            return "Other Error"
 
 
 if __name__ == "__main__":
@@ -606,122 +617,3 @@ if __name__ == "__main__":
     # myKnot.smoothCrossing(smooth)
     # print("\nAfter smoothing {}".format(smooth))
     # print(myKnot)
-
-
-
-    
-
- 
-
-    # print(myKnot.computeHomfly())
-
-    ################## -------------- TS5 --------- ##############
-
-    # print("original: ")
-    # print(myKnot)
-
-    # smooth 0
-    # smooth = 0
-    # myKnot.smoothCrossing(smooth)
-    # print("\nAfter smoothing {}".format(smooth))
-    # print(myKnot)
-
-    # # reduce
-    # myKnot.reduceR1s()
-    # print("\nAfter reducing")
-    # print(myKnot)
-
-    # # swap 1
-    # swap = 1
-    # myKnot.swapCrossing(swap)
-    # print("\nAfter swapping {}".format(swap))
-    # print(myKnot)
-
-    # # reduce
-    # myKnot.reduceR1s()
-    # print("\nAfter reducing")
-    # print(myKnot)
-
-
-    ################## -------------- NEW2 ------------ ###############
-    # print("original: ")
-    # printStuff()
-
-    # # test swap crossings
-    # swap = 0
-    # myKnot.swapCrossing(swap)
-    # print("\nAfter swapping {}".format(swap))
-    # printStuff()
-
-    # # test reduce
-    # myKnot.reduceR1s()
-    # print("\nAfter reducing")
-    # printStuff()
-
-    ################ ------------- NEW1 ------------- ###############
-    # print("original: ")
-    # printStuff()
-
-    # print("\nGetting an R1 should be None: {}".format(myKnot.getR1Crossing()))
-
-    # # test swap crossings
-    # swap = 0
-    # myKnot.swapCrossing(swap)
-    # print("\nAfter swapping {}".format(swap))
-    # printStuff()
-
-    # print("\nGetting an R1 should be (1, [0, 2], 'i1', 'over'): {}".format(myKnot.getR1Crossing()))
-
-    # # test removal
-    # remove = 0
-    # myKnot.removeCrossing(remove)
-    # print("\nAfter removing {}".format(remove))
-    # printStuff()
-
-    # # test removal
-    # remove = 2
-    # myKnot.removeCrossing(remove)
-    # print("\nAfter removing {}".format(remove))
-    # printStuff()
-
-    # print("\nGetting an R1 should be (1, [], 'over'): {}".format(myKnot.getR1Crossing()))
-
-    # # test removal
-    # remove = 1
-    # myKnot.removeCrossing(remove)
-    # print("\nAfter removing {}".format(remove))
-    # printStuff()
-
-    # print("\nGetting an R1 should be (3, [], 'over'): {}".format(myKnot.getR1Crossing()))
-
-    # # test removal
-    # remove = 3
-    # myKnot.removeCrossing(remove)
-    # print("\nAfter removing {}".format(remove))
-    # printStuff()
-
-    # print("\nGetting an R1 should be None: {}".format(myKnot.getR1Crossing()))
-
-
-#################### ------------------------------ #################
-
-
-
-
-
-# TODO:
-# - undo all trivial R1 moves to cut down on necessary recursive steps also cus ez
-# - smooth a crossing
-# - write compute function for HOMFLY
-# - encorporate KnotDiagram into KnotHandler.py
-# - evaluate whether or not to do another invariant, fix spine cleaning, or 
-#   start frontend work
-# - write algo-style proofs for swapping and smoothing
-# - it's possible to undo R2 moves using neighbor checking
-# - create an iterator or just a function that returns a path looping around the knot
-#  - can be used in getCrossingsBetween and also figuring out if an R1 crossing
-# in theory, we technically don't need to know how each neighbor arrives:
-        # jNOutDir = 'k' if jCrossOther == jN else 'i1'
-        # i1NInDir = 'j' if iCross1 == i1N else 'i0'
-        # i0NOutDir = 'k' if iCross0 == i0N else 'i1'
-        # kNInDir = 'j' if kCrossOther == kN else 'i0'
