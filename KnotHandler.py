@@ -200,8 +200,7 @@ class KnotHandler(): # TODO: delete self variables for certain steps once they'r
                     endPoints = list(endPoints)
                     if len(endPoints) > 1:
                         if len(endPoints) > 2:
-                            print("Error: Multiple lines collided at the same time.")
-                            return
+                            raise Exception("Error: Multiple lines collided at the same time.")
                         # ensure we haven't already assigned a connection
                         if (self.ah.getEndPointPair(endPoints[0]) is None
                             and self.ah.getEndPointPair(endPoints[1]) is None):

@@ -17,12 +17,17 @@ class Knot:
             for c in range(len(ijkCrossings)):
                 # get i0 neighbor and the incoming direction into said neighbor
                 i = ijkCrossings[c]['i']
+                j = ijkCrossings[c]['j']
+                k = ijkCrossings[c]['k']
                 i0N, i0NIncDir = ijkCrossingNs[c]['i0']
 
                 # update self
-                ijkCrossings[c]['i0'] = nextNum
-                ijkCrossings[c]['i1'] = i
-                del ijkCrossings[c]['i']
+                ijkCrossings[c] = {
+                    'i0': nextNum,
+                    'i1': i,
+                    'j': j,
+                    'k': k
+                }
 
                 # update neighbor behind me
                 ijkCrossings[i0N][i0NIncDir] = nextNum
@@ -407,7 +412,7 @@ class Knot:
         return myPaths
 
     # internal recursive function for computing homfly
-    def _homfly(self, k, l, m, depth, depthLim, distCrossing=None):
+    def _homfly(self, k, l, m, depth, depthLim, crossingsDist):
         print("{}: computing HOMFLY:".format(k.name))
 
         # reduce all R1 crossings out of our knot
@@ -427,11 +432,18 @@ class Knot:
             print("{}: hit basecase, n={}:  {}".format(k.name, n, poly))
             return poly
 
-        # get our distinguished crossing if not given
-        if distCrossing is None:
-            validCrossings = [i for i, c in enumerate(k.ijkCrossings) if c is not None]
-            distCrossing = validCrossings[0]
+        # get our distinguished crossing
+        print("Distinguished so far: {}".format(crossingsDist))
+        validCrossings = [
+            i for i, c in enumerate(k.ijkCrossings)
+            if c is not None and i not in crossingsDist
+        ]
+        validCrossings.sort()
+        distCrossing = validCrossings[0]
         isRight = {'right': True, 'left': False}[k.handedness[distCrossing]]
+
+        # mark crossing as distinguished so it doesn't happen again
+        crossingsDist.add(distCrossing)
         
         # copy knot, append modification to name
         kR, kL, kS = k.duplicate(), k.duplicate(), k.duplicate()
@@ -458,12 +470,12 @@ class Knot:
 
         # compute necessary polynomials
         if isRight:
-            pL = self._homfly(kL, l, m, depth + 1, depthLim)
+            pL = self._homfly(kL, l, m, depth + 1, depthLim, copy.deepcopy(crossingsDist))
             print("{}: solved: {}".format(kL.name, pL))
         else:
-            pR = self._homfly(kR, l, m, depth + 1, depthLim)
+            pR = self._homfly(kR, l, m, depth + 1, depthLim, copy.deepcopy(crossingsDist))
             print("{}: solved: {}".format(kR.name, pR))
-        pS = self._homfly(kS, l, m, depth + 1, depthLim)
+        pS = self._homfly(kS, l, m, depth + 1, depthLim, copy.deepcopy(crossingsDist))
         print("{}: solved: {}".format(kS.name, pS))
 
         # return equation solved for the correct polynomial
@@ -483,17 +495,50 @@ class Knot:
         l, m = symbols("l m")
 
         try:
-            homfly = self._homfly(self.duplicate(name="K"), l, m, 0, depthLim)
+            homfly = self._homfly(self.duplicate(name="K"), l, m, 0, depthLim, set())
             return latexForm(homfly) if latex else homfly
         except RecError:
             return "Recursion Error"
-        except Exception:
-            return "Other Error"
+        except IndexError:
+            return "Ran out of crossings to distinguish"
+        except Exception as e:
+            return e
 
 
 if __name__ == "__main__":
-    from KnotCanvas import main
-    main()
+    # from KnotCanvas import main
+    # main()
+
+    # another taurus
+    ijkCrossings = [
+        {'i0': 7, 'i1': 1, 'j': 2, 'k': 11},
+        {'i0': 8, 'i1': 3, 'j': 0, 'k': 12},
+        {'i0': 9, 'i1': 6, 'j': 5, 'k': 13},
+        {'i0': 10, 'i1': 2, 'j': 4, 'k': 7},
+        {'i0': 11, 'i1': 0, 'j': 1, 'k': 8},
+        {'i0': 12, 'i1': 5, 'j': 3, 'k': 9},
+        {'i0': 13, 'i1': 4, 'j': 6, 'k': 10}
+    ]
+    handedness = ['right', 'right', 'right', 'right', 'right', 'right', 'right']
+
+    myKnot = Knot(ijkCrossings, handedness)
+
+    print(myKnot.computeHomfly())
+
+    # # taurus
+    # ijkCrossings = [
+    #     {'i0': 5, 'i1': 1, 'j': 0, 'k': 8},
+    #     {'i0': 6, 'i1': 3, 'j': 4, 'k': 9},
+    #     {'i0': 7, 'i1': 0, 'j': 2, 'k': 5},
+    #     {'i0': 8, 'i1': 4, 'j': 1, 'k': 6},
+    #     {'i0': 9, 'i1': 2, 'j': 3, 'k': 7}
+    # ]
+    # handedness = ['right', 'right', 'right', 'right', 'right']
+
+    # myKnot = Knot(ijkCrossings, handedness)
+
+    # print(myKnot.computeHomfly())
+
     # # figure 8 knot
     # ijkCrossings = [
     #     {'i0': 3, 'i1': 4, 'j': 6, 'k': 7},

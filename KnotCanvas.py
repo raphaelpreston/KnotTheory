@@ -105,4 +105,9 @@ def main(filePath=None): # ignore already declared error
     # TODO: fix multiple spines
 
 if __name__ == '__main__':
-    main()
+    try:
+        main()
+    except Exception as e:
+        print("excepted here!!1111111111111111111")
+    finally:
+        print("herelkjasljfaklsj")

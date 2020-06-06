@@ -9,7 +9,7 @@ from random import sample
 POINTS_TO_CUT = 5
 
 # number of points towards the endpoint to be used for linear regression
-POINTS_FOR_LINREG = 20
+POINTS_FOR_LINREG = 5
 
 # (traveled, not absolute), length of line created by the pixels on i to get
 # handedness of crossing
